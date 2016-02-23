@@ -4,15 +4,16 @@
     <script type="text/javascript">
       google.charts.load('current', {'packages':['corechart']});
       google.charts.setOnLoadCallback(redraw);
-      function drawChart(rawData) {
+      function drawChart(rawData, numElements) {
         var data = google.visualization.arrayToDataTable(rawData);
 
         var options = {
-          title: 'Company Performance',
-          hAxis: {title: 'Year',
+          title: 'Bloom Filter False Positive Probabilities (n=' +
+                 numElements + ')',
+          hAxis: {title: 'Bits (m)',
                   titleTextStyle: {color: '#333'},
                   logScale: true},
-          vAxis: {minValue: 0}
+          vAxis: {title: 'p', minValue: 0}
         };
 
         var chart = new google.visualization.AreaChart(document.getElementById('chart_div'));
@@ -23,48 +24,53 @@
         return Math.pow(1.0 - Math.exp(-k * n / m), k);
       }
 
+      var hashes = [1, 2, 4];
+      var bitCounts = [512, 1024, 2048, 4096, 8192, 16384, 32768, 65536];
       function redraw() {
-        var hashes = [1, 2, 4, 8];
-        var elementCounts = [10, 100, 500, 1000, 5000, 10000, 50000];
-        var headers = ["Elements"];
+        var headers = ["Bits (m)"];
         var rawData = [];
-        var bits = parseInt(document.getElementById("bits").value);
+        var numElements = parseInt(document.getElementById("numelements").value);
 
-        console.log(bits);
         for (var i = 0; i < hashes.length; i++) {
-            headers.push(hashes[i] + " hashes");
+            headers.push(hashes[i] + " hashes (k=" + hashes[i] + ")");
         }
+        headers.push("k = (m / n) * ln(2)")
 
         rawData.push(headers)
-        for (var i = 0; i < elementCounts.length; i++) {
-            var count = elementCounts[i];
-            var row = [count];
+        for (var i = 0; i < bitCounts.length; i++) {
+            var bits = bitCounts[i];
+
+            var row = [bits];
             for (var j = 0; j < hashes.length; j++) {
-                row.push(falsePositiveP(bits, count, hashes[j]));
+                row.push(falsePositiveP(bits, numElements, hashes[j]));
             }
+            row.push(falsePositiveP(bits, numElements,
+                                    (bits / numElements) * Math.log(2)));
             rawData.push(row);
         }
 
-        drawChart(rawData);
+        drawChart(rawData, numElements);
       }
     </script>
   </head>
   <body>
+    <form onsubmit="redraw(); return false;">
     <table>
         <tr>
             <td>
-                <label>Bits:</label>
+                <label>Elements (n):</label>
             </td>
             <td>
-                <input id="bits" type=text value="1024"></input>
+                <input id="numelements" type=text value="100"></input>
             </td>
         </tr>
         <tr>
             <td>
-                <button type="button" onclick="redraw();">Redraw</button>
+                <button type="submit">Redraw</button>
             </td>
         </tr>
     </table>
+    </form>
     <div id="chart_div" style="width: 900px; height: 500px;"></div>
   </body>
 </html>
