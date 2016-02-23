@@ -1,0 +1,70 @@
+<html>
+  <head>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+      google.charts.load('current', {'packages':['corechart']});
+      google.charts.setOnLoadCallback(redraw);
+      function drawChart(rawData) {
+        var data = google.visualization.arrayToDataTable(rawData);
+
+        var options = {
+          title: 'Company Performance',
+          hAxis: {title: 'Year',
+                  titleTextStyle: {color: '#333'},
+                  logScale: true},
+          vAxis: {minValue: 0}
+        };
+
+        var chart = new google.visualization.AreaChart(document.getElementById('chart_div'));
+        chart.draw(data, options);
+      }
+
+      function falsePositiveP(m, n, k) {
+        return Math.pow(1.0 - Math.exp(-k * n / m), k);
+      }
+
+      function redraw() {
+        var hashes = [1, 2, 4, 8];
+        var elementCounts = [10, 100, 500, 1000, 5000, 10000, 50000];
+        var headers = ["Elements"];
+        var rawData = [];
+        var bits = parseInt(document.getElementById("bits").value);
+
+        console.log(bits);
+        for (var i = 0; i < hashes.length; i++) {
+            headers.push(hashes[i] + " hashes");
+        }
+
+        rawData.push(headers)
+        for (var i = 0; i < elementCounts.length; i++) {
+            var count = elementCounts[i];
+            var row = [count];
+            for (var j = 0; j < hashes.length; j++) {
+                row.push(falsePositiveP(bits, count, hashes[j]));
+            }
+            rawData.push(row);
+        }
+
+        drawChart(rawData);
+      }
+    </script>
+  </head>
+  <body>
+    <table>
+        <tr>
+            <td>
+                <label>Bits:</label>
+            </td>
+            <td>
+                <input id="bits" type=text value="1024"></input>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <button type="button" onclick="redraw();">Redraw</button>
+            </td>
+        </tr>
+    </table>
+    <div id="chart_div" style="width: 900px; height: 500px;"></div>
+  </body>
+</html>
