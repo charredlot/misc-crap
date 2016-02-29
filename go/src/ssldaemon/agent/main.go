@@ -51,7 +51,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		rcver.Loop()
+		rcver.Tick()
 	}()
 	util.WaitForSignal(func() {})
 }

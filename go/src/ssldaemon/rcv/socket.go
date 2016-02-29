@@ -10,7 +10,7 @@ import (
 
 type Receiver interface {
 	ReadFrom(reader io.Reader)
-	Loop()
+	Tick()
 	Cleanup()
 }
 
@@ -46,6 +46,6 @@ func (pr *PrintReceiver) ReadFrom(reader io.Reader) {
 	protocol.PrintSecrets(reader)
 }
 
-func (pr *PrintReceiver) Loop() {}
+func (pr *PrintReceiver) Tick() {}
 
 func (pr *PrintReceiver) Cleanup() {}

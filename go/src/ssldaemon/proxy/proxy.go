@@ -74,7 +74,7 @@ func (proxy *Proxy) ReadFrom(reader io.Reader) {
 	}
 }
 
-func (proxy *Proxy) Loop() {
+func (proxy *Proxy) Tick() {
 	tick := time.NewTicker(15 * time.Second)
 	defer tick.Stop()
 
