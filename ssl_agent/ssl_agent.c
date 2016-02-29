@@ -195,14 +195,14 @@ ctx_socket_cleanup(struct ssl_agent_ctx *c)
 static int
 ctx_handshake_send(struct ssl_agent_ctx *c)
 {
-    struct pkt_handshake_hdr handshake;
+    struct sa_handshake_hdr handshake;
 
     handshake.version = SSL_AGENT_VERSION;
-    handshake.hdr_len = htons(sizeof(struct pkt_handshake_hdr));
+    handshake.hdr_len = htons(sizeof(struct sa_handshake_hdr));
 
     errno = 0;
-    if (send(c->fd, &handshake, sizeof(struct pkt_handshake_hdr), 0) !=
-            sizeof(struct pkt_handshake_hdr)) {
+    if (send(c->fd, &handshake, sizeof(struct sa_handshake_hdr), 0) !=
+            sizeof(struct sa_handshake_hdr)) {
         log_debug("daemon handshake send err: %s\n", strerror(errno));
         if ((errno != EAGAIN) && (errno != EWOULDBLOCK)) {
             ctx_socket_cleanup(c);
@@ -236,7 +236,7 @@ ctx_set_nonblocking(struct ssl_agent_ctx *c)
 static int
 ctx_handshake_recv(struct ssl_agent_ctx *c)
 {
-    struct pkt_handshake_hdr handshake;
+    struct sa_handshake_hdr handshake;
     uint16_t len;
     uint8_t *buf = NULL;
     ssize_t n;
@@ -244,8 +244,8 @@ ctx_handshake_recv(struct ssl_agent_ctx *c)
 
     /* TODO: assuming we don't get a partial header for now */
     errno = 0;
-    n = recv(c->fd, &handshake, sizeof(struct pkt_handshake_hdr), 0);
-    if (n != sizeof(struct pkt_handshake_hdr)) {
+    n = recv(c->fd, &handshake, sizeof(struct sa_handshake_hdr), 0);
+    if (n != sizeof(struct sa_handshake_hdr)) {
         log_error("%s: recv %s\n", __func__, strerror(errno));
         goto err;
     }
@@ -264,8 +264,8 @@ ctx_handshake_recv(struct ssl_agent_ctx *c)
         goto err;
     }
 
-    if (len > sizeof(struct pkt_handshake_hdr)) {
-        len -= sizeof(struct pkt_handshake_hdr);
+    if (len > sizeof(struct sa_handshake_hdr)) {
+        len -= sizeof(struct sa_handshake_hdr);
 
         for (read = 0; read < len;) {
             n = recv(c->fd, buf, len, 0);
@@ -359,8 +359,10 @@ export_master_secret(SSL *s)
 {
     size_t bytes;
     size_t written;
-    struct pkt_session_frame {
-        struct pkt_session_hdr hdr;
+    struct sa_frame {
+        struct sa_record_hdr hdr;
+        uint8_t client_random[SSL3_RANDOM_SIZE];
+        uint8_t server_random[SSL3_RANDOM_SIZE];
         uint8_t master_secret[SSL_MAX_MASTER_KEY_LENGTH];
     } frame;
     SSL_SESSION *session;
@@ -393,14 +395,18 @@ export_master_secret(SSL *s)
         return;
     }
 
-    memcpy(frame.hdr.client_random, s3->client_random, SSL3_RANDOM_SIZE);
-    memcpy(frame.hdr.server_random, s3->server_random, SSL3_RANDOM_SIZE);
-
+    frame.hdr.type = SSL_AGENT_RECORD_CLIENT_SERVER_RANDOMS_TO_SECRET;
     frame.hdr.master_secret_len = (uint8_t)session->master_key_length;
-    memcpy(frame.master_secret, session->master_key,
+    frame.hdr.len = htonl(sizeof(struct sa_record_hdr) +
+                          frame.hdr.master_secret_len +
+                          (2 * SSL3_RANDOM_SIZE));
+
+    memcpy(&frame.client_random, s3->client_random, SSL3_RANDOM_SIZE);
+    memcpy(&frame.server_random, s3->server_random, SSL3_RANDOM_SIZE);
+    memcpy(&frame.master_secret, session->master_key,
            frame.hdr.master_secret_len);
 
-    bytes = sizeof(struct pkt_session_hdr) + frame.hdr.master_secret_len;
+    bytes = ntohl(frame.hdr.len);
     errno = 0;
     written = write(ctx.fd, &frame, bytes);
     if (written != bytes) {
