@@ -227,7 +227,7 @@ ctx_set_nonblocking(struct ssl_agent_ctx *c)
     errno = 0;
     rc = fcntl(c->fd, F_SETFL, flags | O_NONBLOCK);
     if (rc != 0) {
-        log_warn("fcntl failed %s\n", strerror(errno));        
+        log_warn("fcntl failed %s\n", strerror(errno));
     }
 
     return rc;
@@ -287,7 +287,7 @@ ctx_handshake_recv(struct ssl_agent_ctx *c)
         free(buf);
     }
     ctx_socket_cleanup(c);
-    return -1;        
+    return -1;
 }
 
 static int
@@ -411,7 +411,7 @@ export_master_secret(SSL *s)
         else {
             log_warn("write master key failed %" PRIu64 " %s\n",
                      (uint64_t)written, strerror(errno));
-            ctx_socket_cleanup(&ctx); 
+            ctx_socket_cleanup(&ctx);
         }
     }
 }
