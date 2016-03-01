@@ -78,7 +78,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		go rcver.Tick()
+		rcver.Tick()
 	}()
 
 	wg.Add(1)
