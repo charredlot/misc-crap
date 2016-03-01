@@ -39,7 +39,7 @@ enum conn_state {
     CONN_SEND_DATA,
 };
 
-struct ssl_hijack_ctx {
+struct ssl_agent_ctx {
     pthread_t pthread;
     pid_t tid;
     uint64_t export_no_sock;
@@ -52,7 +52,7 @@ struct ssl_hijack_ctx {
     int fd;
     bool f_initialized;
 };
-static __thread struct ssl_hijack_ctx ctx;
+static __thread struct ssl_agent_ctx ctx;
 
 static bool log_dirty;
 static int log_level = LOG_DEBUG;
@@ -182,7 +182,7 @@ print_master_secret(SSL *s)
 }
 
 static void
-ctx_socket_cleanup(struct ssl_hijack_ctx *c)
+ctx_socket_cleanup(struct ssl_agent_ctx *c)
 {
     log_debug("cleanup socket fd %d\n", c->fd);
     if (c->fd >= 0) {
@@ -193,7 +193,7 @@ ctx_socket_cleanup(struct ssl_hijack_ctx *c)
 }
 
 static int
-ctx_handshake_send(struct ssl_hijack_ctx *c)
+ctx_handshake_send(struct ssl_agent_ctx *c)
 {
     struct pkt_handshake_hdr handshake;
 
@@ -218,7 +218,7 @@ ctx_handshake_send(struct ssl_hijack_ctx *c)
 }
 
 static int
-ctx_set_nonblocking(struct ssl_hijack_ctx *c)
+ctx_set_nonblocking(struct ssl_agent_ctx *c)
 {
     int rc;
     int flags;
@@ -234,7 +234,7 @@ ctx_set_nonblocking(struct ssl_hijack_ctx *c)
 }
 
 static int
-ctx_handshake_recv(struct ssl_hijack_ctx *c)
+ctx_handshake_recv(struct ssl_agent_ctx *c)
 {
     struct pkt_handshake_hdr handshake;
     uint16_t len;
@@ -291,7 +291,7 @@ ctx_handshake_recv(struct ssl_hijack_ctx *c)
 }
 
 static int
-ctx_handshake(struct ssl_hijack_ctx *c)
+ctx_handshake(struct ssl_agent_ctx *c)
 {
     int rc = -1;
 
@@ -315,7 +315,7 @@ ctx_handshake(struct ssl_hijack_ctx *c)
 }
 
 static int
-ctx_socket_connect(struct ssl_hijack_ctx *c)
+ctx_socket_connect(struct ssl_agent_ctx *c)
 {
     int fd = -1;
     struct sockaddr_un addr;
