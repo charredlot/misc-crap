@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"encoding/binary"
 	"encoding/hex"
-    "errors"
-    "fmt"
+	"errors"
+	"fmt"
 	"io"
 	"log"
 )
@@ -61,12 +61,15 @@ func rcvHandshakeBytes(rw io.ReadWriter, id string) error {
 		return err
 	}
 
-	/* TODO: sizeof HandshakeHdr */
+	if h.HdrLen != uint16(binary.Size(&h)) {
+		return errors.New(fmt.Sprintf("bad hdr len %+v", h))
+	}
+
 	if h.HdrLen > uint16(binary.Size(&h)) {
 		skip := int(h.HdrLen) - binary.Size(&h)
-        if skip < 0 {
-            return errors.New(fmt.Sprintf("bad hdr len %+v", h))
-        }
+		if skip < 0 {
+			return errors.New(fmt.Sprintf("bad hdr len %+v", h))
+		}
 
 		b := make([]byte, skip)
 

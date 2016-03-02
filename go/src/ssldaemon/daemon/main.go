@@ -58,6 +58,36 @@ func initReceiver(host string, forwardHandshake bool) rcv.Receiver {
 	}
 }
 
+func launchListener(wg *sync.WaitGroup, l net.Listener,
+	connRcv rcv.Receiver) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		connRcv.Tick()
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		rcv.AcceptConns(l, connRcv)
+	}()
+}
+
+func launchBrowserLog(wg *sync.WaitGroup, logfile *rcv.Logfile,
+	logRcv rcv.Receiver) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		logRcv.Tick()
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		logfile.ReadLoop(logRcv)
+	}()
+}
+
 func main() {
 	var wg sync.WaitGroup
 
@@ -70,22 +100,24 @@ func main() {
 	defer wg.Wait()
 
 	l := initListener(options.ListenHost)
+	if l == nil {
+		os.Exit(1)
+	}
 	defer l.Close()
 
-	rcver := initReceiver(options.ForwardHost, options.ForwardHandshake)
-	defer rcver.Cleanup()
+	connRcv := initReceiver(options.ForwardHost, options.ForwardHandshake)
+	defer connRcv.Cleanup()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		rcver.Tick()
-	}()
+	launchListener(&wg, l, connRcv)
+	if options.BrowserLog != "" {
+		logfile := rcv.NewLogfile(options.BrowserLog)
+		defer logfile.Cleanup()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		rcv.AcceptConns(l, rcver)
-	}()
+		logRcv := initReceiver(options.ForwardHost, options.ForwardHandshake)
+		defer logRcv.Cleanup()
+
+		launchBrowserLog(&wg, logfile, logRcv)
+	}
 
 	util.WaitForSignal(func() {})
 }

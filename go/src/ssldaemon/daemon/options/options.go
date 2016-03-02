@@ -11,6 +11,7 @@ var (
     ForwardHandshake bool
     Debug bool
     Diagnostic bool
+    BrowserLog string
 )
 
 func Load() error {
@@ -20,6 +21,8 @@ func Load() error {
         "host to forward to")
     flag.BoolVar(&ForwardHandshake, "handshake", false,
         "whether to handshake with the forwarder")
+    flag.StringVar(&BrowserLog, "browser-log", "",
+        "output of SSLKEYLOGFILE for firefox and chrome")
 
     flag.BoolVar(&Debug, "d", false, "debug mode (verbose)")
     flag.BoolVar(&Diagnostic, "diagnostic", false, "diagnostic mode")
