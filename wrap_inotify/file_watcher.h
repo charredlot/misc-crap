@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdbool.h>
+
 struct file_watcher;
 
 struct file_watcher *

@@ -2,15 +2,25 @@
 CC=gcc
 CFLAGS=-g -Wall -Werror -O3
 
-TARGET=file_watcher_test
-SRC=file_watcher_inotify.c file_watcher_test.c
+TARGETLIB=libfilewatcher.so
+
+TARGETTEST=file_watcher_test
+LDFLAGSTEST=-L$(shell pwd) -lfilewatcher
+
+SRC=file_watcher_inotify.c
 OBJS=$(patsubst %.c,%.o,$(SRC))
 
-default: $(TARGET)
+default: $(TARGETLIB) $(TARGETTEST)
 
-$(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
+$(OBJS): $(SRC)
+	$(CC) $(CFLAGS) -fPIC -c -o $@ $^
+
+$(TARGETLIB): $(OBJS)
+	$(CC) $(CFLAGS) -shared -o $@ $^
+
+$(TARGETTEST): file_watcher_test.c
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGSTEST)
 
 .PHONY: clean
 clean:
-	$(RM) $(OBJS) $(TARGET)
+	$(RM) $(OBJS) $(TARGETTEST) $(TARGETLIB)
