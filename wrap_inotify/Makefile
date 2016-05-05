@@ -5,7 +5,7 @@ CFLAGS=-g -Wall -Werror -O3
 TARGETLIB=libfilewatcher.so
 
 TARGETTEST=file_watcher_test
-LDFLAGSTEST=-L$(shell pwd) -lfilewatcher
+LDFLAGSTEST=-L$(shell pwd) -lfilewatcher -Xlinker -rpath $(shell pwd)
 
 SRC=file_watcher_inotify.c
 OBJS=$(patsubst %.c,%.o,$(SRC))
