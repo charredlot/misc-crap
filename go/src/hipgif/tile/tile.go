@@ -1,18 +1,12 @@
-package main
+package tile
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"image"
 	"image/color"
 	"image/gif"
 	"os"
-)
-
-var (
-	debug     bool
-	macroName string
 )
 
 func cropFrame(frame *image.Paletted, rect image.Rectangle) (*image.Paletted,
@@ -21,7 +15,7 @@ func cropFrame(frame *image.Paletted, rect image.Rectangle) (*image.Paletted,
 
 	targetRect := rect.Intersect(frame.Rect)
 
-	if debug {
+	if Debug {
 		fmt.Printf("%+v len %d stride %d target %+v\n", frame.Rect,
 			len(frame.Pix), frame.Stride, targetRect)
 	}
@@ -74,7 +68,7 @@ func cropGIF(g *gif.GIF, rect image.Rectangle) (*gif.GIF, error) {
 		}
 
 		if newFrame == nil {
-			if debug {
+			if Debug {
 				fmt.Println("  empty frame after cropping")
 			}
 		} else {
@@ -82,7 +76,7 @@ func cropGIF(g *gif.GIF, rect image.Rectangle) (*gif.GIF, error) {
 			newGif.Delay = append(newGif.Delay, g.Delay[i])
 			newGif.Disposal = append(newGif.Disposal, g.Disposal[i])
 
-			if debug {
+			if Debug {
 				fmt.Printf("  %+v len %d stride %d\n", newFrame.Rect,
 					len(newFrame.Pix), newFrame.Stride)
 			}
@@ -111,7 +105,7 @@ func cropAndWriteGIF(g *gif.GIF, rect image.Rectangle, index int) error {
 		return errors.New(fmt.Sprintf("crop error %s %v", filename, err))
 	}
 
-	if debug {
+	if Debug {
 		fmt.Printf("%d new dim %d x %d\n", index,
 			edited.Config.Width, edited.Config.Height)
 	}
@@ -158,7 +152,7 @@ func getTiles(maxWidth, maxHeight int) ([]image.Rectangle, error) {
 
 			imgFilename := outFilename(len(rects))
 			html.WriteString(fmt.Sprintf("<img src=\"%s\">\n", imgFilename))
-			fmt.Fprintf(os.Stderr, "(%s%d)", macroName, len(rects))
+			fmt.Fprintf(os.Stderr, "(%s%d)", MacroName, len(rects))
 			rects = append(rects, rect)
 		}
 		html.WriteString("<br>\n")
@@ -169,7 +163,7 @@ func getTiles(maxWidth, maxHeight int) ([]image.Rectangle, error) {
 	return rects, nil
 }
 
-func tileGIF(g *gif.GIF) error {
+func TileGIF(g *gif.GIF) error {
 	// assume first image has full bounds of image
 	rects, err := getTiles(g.Config.Width, g.Config.Height)
 	if err != nil {
@@ -184,32 +178,4 @@ func tileGIF(g *gif.GIF) error {
 	}
 
 	return nil
-}
-
-func main() {
-	flag.BoolVar(&debug, "v", false, "verbose")
-	flag.StringVar(&macroName, "macro", "img",
-		"name for image macro in hipchat")
-	flag.Parse()
-
-	filename := flag.Args()[0]
-	f, err := os.Open(filename)
-	if err != nil {
-		fmt.Println("open error", filename, err)
-		return
-	}
-	defer f.Close()
-
-	g, err := gif.DecodeAll(f)
-	if err != nil {
-		fmt.Println("gif error", err)
-		return
-	}
-	fmt.Fprintf(os.Stderr, "frames %d width %d x height %d\n",
-		len(g.Image), g.Config.Width, g.Config.Height)
-
-	err = tileGIF(g)
-	if err != nil {
-		fmt.Println("tile error", err)
-	}
 }
