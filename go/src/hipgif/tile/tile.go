@@ -6,8 +6,11 @@ import (
 	"image"
 	"image/color"
 	"image/gif"
+	"io"
 	"os"
 )
+
+type GetURI func(row int, col int) string
 
 func cropFrame(frame *image.Paletted, rect image.Rectangle) (*image.Paletted,
 	error) {
@@ -88,12 +91,7 @@ func cropGIF(g *gif.GIF, rect image.Rectangle) (*gif.GIF, error) {
 	return &newGif, nil
 }
 
-func outFilename(index int) string {
-	return fmt.Sprintf("./tmp%d.gif", index)
-}
-
-func writeGIF(g *gif.GIF, index int) error {
-	filename := outFilename(index)
+func writeGIF(g *gif.GIF, filename string) error {
 	out, err := os.Create(filename)
 	if err != nil {
 		return errors.New(fmt.Sprintf("open error %s %v", filename, err))
@@ -110,33 +108,41 @@ func writeGIF(g *gif.GIF, index int) error {
 	return nil
 }
 
-func createPreview(rects [][]image.Rectangle) {
-	filename := "./tmp.html"
+func WriteHTMLPreview(w io.Writer, rows, cols int, uri GetURI) error {
+	for row := 0; row < rows; row++ {
+		_, err := w.Write([]byte("<div>"))
+		if err != nil {
+			return err
+		}
+
+		for col := 0; col < cols; col++ {
+			_, err := w.Write([]byte(
+				fmt.Sprintf("<img src=\"%s\">", uri(row, col))))
+			if err != nil {
+				return err
+			}
+		}
+		_, err = w.Write([]byte("</div>\n"))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func writeHTMLPreviewToFile(filename string, rows, cols int, uri GetURI) error {
 	html, err := os.Create(filename)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error creating preview file %s %s\n",
-			filename, err)
-		return
+		return errors.New(fmt.Sprintf(
+			"error creating preview file %s %s\n", filename, err))
 	}
 	defer html.Close()
 
-	fmt.Fprintf(os.Stderr, "hipchat macro:\n")
-
 	html.WriteString("<html><body>\n")
-	var index int
-	for row := range rects {
-		for _ = range rects[row] {
-			imgFilename := outFilename(index)
-			html.WriteString(fmt.Sprintf("<img src=\"%s\">\n", imgFilename))
-			fmt.Fprintf(os.Stderr, "(%s%d)", MacroName, index)
-			index += 1
-		}
-		html.WriteString("<br>\n")
-	    fmt.Fprintf(os.Stderr, "\n")
-	}
+	WriteHTMLPreview(html, rows, cols, uri)
 	html.WriteString("</body></html>\n")
-
-	fmt.Fprintf(os.Stderr, "wrote preview file %s\n", filename)
+	return nil
 }
 
 func getTiles(maxWidth, maxHeight int) ([][]image.Rectangle, error) {
@@ -168,7 +174,7 @@ func getTiles(maxWidth, maxHeight int) ([][]image.Rectangle, error) {
 	return rects, nil
 }
 
-func TileGIF(g *gif.GIF, rects [][]image.Rectangle) ([][]*gif.GIF, error) {
+func TileGIF(g *gif.GIF) ([][]*gif.GIF, error) {
 	rects, err := getTiles(g.Config.Width, g.Config.Height)
 	if err != nil {
 		return nil, err
@@ -197,26 +203,37 @@ func TileGIF(g *gif.GIF, rects [][]image.Rectangle) ([][]*gif.GIF, error) {
 }
 
 func TileGIFToFiles(g *gif.GIF) error {
-	// assume first image has full bounds of image
-	rects, err := getTiles(g.Config.Width, g.Config.Height)
-	if err != nil {
-		return err
-	}
-	createPreview(rects)
-
-	gifs, err := TileGIF(g, rects)
+	gifs, err := TileGIF(g)
 	if err != nil {
 		return err
 	}
 
-	var i int
-	for row := range gifs {
-		for col := range gifs[row] {
-			err := writeGIF(gifs[row][col], i)
+	rows := len(gifs)
+	cols := len(gifs[0])
+	getFilename := func(row, col int) string {
+		return fmt.Sprintf("./tmp%d.gif", (row*cols)+col)
+	}
+
+	err = writeHTMLPreviewToFile("./tmp.html", rows, cols, getFilename)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "wrote preview file tmp.html\n")
+
+	fmt.Fprintf(os.Stderr, "hipchat macro:\n")
+	for row := 0; row < rows; row++ {
+		for col := 0; col < cols; col++ {
+			fmt.Fprintf(os.Stderr, "(%s%d)", MacroName, (row*cols)+col)
+		}
+		fmt.Fprintf(os.Stderr, "\n")
+	}
+
+	for row := 0; row < rows; row++ {
+		for col := 0; col < cols; col++ {
+			err := writeGIF(gifs[row][col], getFilename(row, col))
 			if err != nil {
 				return err
 			}
-			i += 1
 		}
 	}
 
