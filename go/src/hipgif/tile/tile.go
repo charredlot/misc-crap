@@ -92,7 +92,7 @@ func outFilename(index int) string {
 	return fmt.Sprintf("./tmp%d.gif", index)
 }
 
-func cropAndWriteGIF(g *gif.GIF, rect image.Rectangle, index int) error {
+func writeGIF(g *gif.GIF, index int) error {
 	filename := outFilename(index)
 	out, err := os.Create(filename)
 	if err != nil {
@@ -100,16 +100,7 @@ func cropAndWriteGIF(g *gif.GIF, rect image.Rectangle, index int) error {
 	}
 	defer out.Close()
 
-	edited, err := cropGIF(g, rect)
-	if err != nil {
-		return errors.New(fmt.Sprintf("crop error %s %v", filename, err))
-	}
-
-	if Debug {
-		fmt.Printf("%d new dim %d x %d\n", index,
-			edited.Config.Width, edited.Config.Height)
-	}
-	err = gif.EncodeAll(out, edited)
+	err = gif.EncodeAll(out, g)
 	if err != nil {
 		return errors.New(fmt.Sprintf("encode error %s %v", filename, err))
 	}
@@ -119,23 +110,42 @@ func cropAndWriteGIF(g *gif.GIF, rect image.Rectangle, index int) error {
 	return nil
 }
 
-func getTiles(maxWidth, maxHeight int) ([]image.Rectangle, error) {
-	var rects []image.Rectangle
-
-	side := maxHeight / 2
-
+func createPreview(rects [][]image.Rectangle) {
 	filename := "./tmp.html"
 	html, err := os.Create(filename)
 	if err != nil {
-		return nil, err
+		fmt.Fprintf(os.Stderr, "error creating preview file %s %s\n",
+			filename, err)
+		return
 	}
 	defer html.Close()
 
-	fmt.Fprintf(os.Stderr, "preview file %s\n", filename)
-	fmt.Fprintln(os.Stderr, "hipchat image macro:")
+	fmt.Fprintf(os.Stderr, "hipchat macro:\n")
 
 	html.WriteString("<html><body>\n")
+	var index int
+	for row := range rects {
+		for _ = range rects[row] {
+			imgFilename := outFilename(index)
+			html.WriteString(fmt.Sprintf("<img src=\"%s\">\n", imgFilename))
+			fmt.Fprintf(os.Stderr, "(%s%d)", MacroName, index)
+			index += 1
+		}
+		html.WriteString("<br>\n")
+	    fmt.Fprintf(os.Stderr, "\n")
+	}
+	html.WriteString("</body></html>\n")
+
+	fmt.Fprintf(os.Stderr, "wrote preview file %s\n", filename)
+}
+
+func getTiles(maxWidth, maxHeight int) ([][]image.Rectangle, error) {
+	var rects [][]image.Rectangle
+
+	side := maxHeight / 2
+
 	for y := 0; y < maxHeight; y += side {
+		row := []image.Rectangle{}
 		for x := 0; x < maxWidth; x += side {
 			var rect image.Rectangle
 
@@ -150,30 +160,63 @@ func getTiles(maxWidth, maxHeight int) ([]image.Rectangle, error) {
 				rect.Max.Y = maxHeight
 			}
 
-			imgFilename := outFilename(len(rects))
-			html.WriteString(fmt.Sprintf("<img src=\"%s\">\n", imgFilename))
-			fmt.Fprintf(os.Stderr, "(%s%d)", MacroName, len(rects))
-			rects = append(rects, rect)
+			row = append(row, rect)
 		}
-		html.WriteString("<br>\n")
-		fmt.Fprintf(os.Stderr, "\n")
+		rects = append(rects, row)
 	}
-	html.WriteString("</body></html>\n")
 
 	return rects, nil
 }
 
-func TileGIF(g *gif.GIF) error {
+func TileGIF(g *gif.GIF, rects [][]image.Rectangle) ([][]*gif.GIF, error) {
+	rects, err := getTiles(g.Config.Width, g.Config.Height)
+	if err != nil {
+		return nil, err
+	}
+
+	var gifs [][]*gif.GIF
+	for row := range rects {
+		currRow := []*gif.GIF{}
+		for col := range rects[row] {
+			cropped, err := cropGIF(g, rects[row][col])
+			if err != nil {
+				return nil, err
+			}
+
+			if Debug {
+				fmt.Printf("new dim %d x %d\n", cropped.Config.Width,
+					cropped.Config.Height)
+			}
+
+			currRow = append(currRow, cropped)
+		}
+		gifs = append(gifs, currRow)
+	}
+
+	return gifs, nil
+}
+
+func TileGIFToFiles(g *gif.GIF) error {
 	// assume first image has full bounds of image
 	rects, err := getTiles(g.Config.Width, g.Config.Height)
 	if err != nil {
-		return nil
+		return err
+	}
+	createPreview(rects)
+
+	gifs, err := TileGIF(g, rects)
+	if err != nil {
+		return err
 	}
 
-	for i := range rects {
-		err := cropAndWriteGIF(g, rects[i], i)
-		if err != nil {
-			return err
+	var i int
+	for row := range gifs {
+		for col := range gifs[row] {
+			err := writeGIF(gifs[row][col], i)
+			if err != nil {
+				return err
+			}
+			i += 1
 		}
 	}
 

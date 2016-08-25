@@ -38,7 +38,7 @@ func main() {
 	fmt.Fprintf(os.Stderr, "frames %d width %d x height %d\n",
 		len(g.Image), g.Config.Width, g.Config.Height)
 
-	err = tile.TileGIF(g)
+	err = tile.TileGIFToFiles(g)
 	if err != nil {
 		fmt.Println("tile error", err)
 		os.Exit(1)
