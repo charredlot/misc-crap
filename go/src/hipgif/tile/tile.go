@@ -74,6 +74,10 @@ func cropGIF(g *gif.GIF, rect image.Rectangle) (*gif.GIF, error) {
 			if Debug {
 				fmt.Println("  empty frame after cropping")
 			}
+			// add delay to prev frame
+			if len(newGif.Delay) > 0 {
+				newGif.Delay[len(newGif.Delay)-1] += g.Delay[i]
+			}
 		} else {
 			newGif.Image = append(newGif.Image, newFrame)
 			newGif.Delay = append(newGif.Delay, g.Delay[i])
