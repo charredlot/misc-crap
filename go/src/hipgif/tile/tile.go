@@ -178,6 +178,26 @@ func getTiles(maxWidth, maxHeight int) ([][]image.Rectangle, error) {
 	return rects, nil
 }
 
+func Rows(tiled [][]*gif.GIF) int {
+	return len(tiled)
+}
+
+func Cols(tiled [][]*gif.GIF) int {
+	if len(tiled) == 0 {
+		return 0
+	}
+	return len(tiled[0])
+}
+
+func At(tiled [][]*gif.GIF, row, col int) *gif.GIF {
+	if row >= Rows(tiled) {
+		return nil
+	} else if col >= Cols(tiled) {
+		return nil
+	}
+	return tiled[row][col]
+}
+
 func TileGIF(g *gif.GIF) ([][]*gif.GIF, error) {
 	rects, err := getTiles(g.Config.Width, g.Config.Height)
 	if err != nil {
