@@ -1,0 +1,23 @@
+<html>
+    <body>
+        <h2>Original</h2>
+        <div><img src="/full?id={{.ID}}"/></div>
+        <h2>Tiled</h2>
+        {{range $row, $cols := .Tiled }}
+            <div>
+            {{- range $col, $unused := $cols }}
+                <img src="/tile/{{$.Prefix}}R{{$row}}C{{$col}}.gif?id={{$.ID}}&row={{$row}}&col={{$col}}"/>
+            {{ end -}}
+            <div>
+        {{end}}
+        <h2>Hipchat Macro</h2>
+        <div>
+        {{range $row, $cols := .Tiled }}
+            {{- range $col, $unused := $cols -}}
+                ({{$.Prefix}}R{{$row}}C{{$col}})
+            {{- end -}}
+            <br>
+        {{end}}
+        </div>
+    </body>
+</html>
