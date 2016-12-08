@@ -1,0 +1,7 @@
+{
+    "server": "localhost:10443",
+    "tls": true,
+    "listen": {
+        ":20000"
+    }
+}
