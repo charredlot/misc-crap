@@ -13,37 +13,48 @@
 #include "file_watcher.h"
 
 struct file_watcher {
+    /* will get at least one event */
+    uint8_t buf[sizeof(struct inotify_event) + NAME_MAX + 1];
+    uint32_t off;
+    uint32_t len;
+
     char *pathname;
     int fd;
     int watch_fd;
     bool debug;
 };
 
-static char *
-event_mask_str(uint32_t mask)
+struct flag_to_char {
+    uint32_t flag;
+    char c;
+};
+
+#define FATAL_MASK (IN_CLOSE_WRITE | IN_IGNORED | IN_DELETE_SELF | \
+                    IN_MOVE_SELF | IN_UNMOUNT)
+static const struct flag_to_char flags_to_char[] = {
+    {IN_DELETE_SELF, 'D'},
+    {IN_IGNORED, 'I'},
+    {IN_MODIFY, 'M'},
+    {IN_MOVE_SELF, 'V'},
+    {IN_UNMOUNT, 'U'},
+};
+#define EVENT_MASK_LEN (sizeof(flags_to_char) / sizeof(flags_to_char[0]))
+#define EVENT_MASK_STR_LEN (EVENT_MASK_LEN + 1)
+
+static void
+event_mask_to_str(uint32_t mask, char buf[EVENT_MASK_STR_LEN])
 {
-    static struct {
-        uint32_t flag;
-        char c;
-    } flag_to_char[] = {
-        {IN_DELETE_SELF, 'D'},
-        {IN_IGNORED, 'I'},
-        {IN_MODIFY, 'M'},
-        {IN_UNMOUNT, 'U'},
-    };
-    static char buf[sizeof(flag_to_char) / sizeof(flag_to_char[0]) + 1];
     int i = 0;
 
-    for (i = 0; i < sizeof(flag_to_char) / sizeof(flag_to_char[0]); i++) {
-        if ((mask & flag_to_char[i].flag) == 0) {
+    for (i = 0; i < EVENT_MASK_LEN; i++) {
+        if ((mask & flags_to_char[i].flag) == 0) {
             buf[i] = '-';
         }
         else {
-            buf[i] = flag_to_char[i].c;
+            buf[i] = flags_to_char[i].c;
         }
     }
     buf[i] = '\0';
-    return buf;
 }
 
 struct file_watcher *
@@ -104,13 +115,59 @@ file_watcher_free(struct file_watcher *fw)
     }
 }
 
+/* pointer returned is only valid until next call and while fw is valid */
+static struct inotify_event *
+file_watcher_read_event(struct file_watcher *fw)
+{
+    struct inotify_event *event;
+    uint32_t event_len;
+
+    /* always start by moving leftover data to front of buf */
+    if (fw->off > 0) {
+        memmove(fw->buf, fw->buf + fw->off, fw->len);
+        fw->off = 0;
+    }
+
+    while (true) {
+        ssize_t n;
+
+        if (fw->len >= sizeof(struct inotify_event)) {
+            event = (struct inotify_event *)fw->buf;
+
+            /* TODO: should we care about overflow of event_len? */
+            event_len = sizeof(struct inotify_event) + event->len;
+            if (event_len <= fw->len) {
+                fw->off += event_len;
+                fw->len -= event_len;
+                return event;
+            }
+        }
+
+        if (fw->len >= sizeof(fw->buf)) {
+            /* should be unreachable... */
+            return NULL;
+        }
+
+        n = read(fw->fd, fw->buf + fw->len, sizeof(fw->buf) - fw->len);
+        if (n < 0) {
+            fprintf(stderr, "%s read failure: %s\n", __func__, strerror(errno));
+            return NULL;
+        }
+        else if (n == 0) {
+            fprintf(stderr, "%s read eof\n", __func__);
+            /* TODO: make sure we can't have leftover events in this case */
+            return NULL;
+        }
+
+        fw->len += n;
+    }
+
+    return NULL;
+}
+
 int
 file_watcher_wait_write(struct file_watcher *fw)
 {
-    ssize_t n;
-    int i;
-    char buf[sizeof(struct inotify_event) + NAME_MAX + 1];
-
     if (fw->watch_fd < 0) {
         fw->watch_fd = inotify_add_watch(fw->fd, fw->pathname,
                                          IN_DELETE_SELF | IN_MODIFY);
@@ -121,35 +178,37 @@ file_watcher_wait_write(struct file_watcher *fw)
         }
     }
 
-    n = read(fw->fd, buf, sizeof(buf));
-    if (n < 0) {
-        fprintf(stderr, "%s read failure: %s\n", __func__, strerror(errno));
-        return -1;
-    }
+    while (true) {
+        struct inotify_event *event;
 
-    if (n == 0) {
-        fprintf(stderr, "%s read eof\n", __func__);
-        return -1;
-    }
-
-    for (i = 0; i <= n - sizeof(struct inotify_event);) {
-        struct inotify_event *event = (struct inotify_event*)buf;
+        event = file_watcher_read_event(fw);
+        if (event == NULL) {
+            return -1;
+        }
 
         if (fw->debug) {
-            printf("wd %d mask 0x%08x %s cookie %u %.*s\n",
-                   event->wd, event->mask,
-                   event_mask_str(event->mask), event->cookie,
+            char event_mask_str[EVENT_MASK_STR_LEN];
+
+            event_mask_to_str(event->mask, event_mask_str);
+            printf("file_watcher: %s wd %d mask 0x%08x %s cookie %u %.*s\n",
+                   fw->pathname, event->wd, event->mask,
+                   event_mask_str, event->cookie,
                    event->len, event->name);
         }
 
-        if ((event->mask & (IN_IGNORED | IN_DELETE_SELF | IN_UNMOUNT)) != 0) {
+        /*
+         * TODO: should double-check behavior of IN_CLOSE_WRITE
+         * probably need to reopen file for e.g. logrotate case
+         * also, not sure what to do for IN_Q_OVERFLOW
+         */
+        if ((event->mask & FATAL_MASK) != 0) {
             close(fw->watch_fd);
             fw->watch_fd = -1;
             return -1;
         }
 
-        i += sizeof(struct inotify_event) + event->len;
+        if ((event->mask & IN_MODIFY) != 0) {
+            return 0;
+        }
     }
-
-    return 0;
 }
