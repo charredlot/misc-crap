@@ -84,7 +84,8 @@ file_watcher_alloc(const char *pathname, bool debug)
     }
 
     fw->watch_fd = inotify_add_watch(fw->fd, fw->pathname,
-                                     IN_DELETE_SELF | IN_MODIFY | IN_UNMOUNT);
+                                     IN_DELETE_SELF | IN_MODIFY | IN_UNMOUNT |
+                                     IN_MOVE_SELF);
     if (fw->watch_fd < 0) {
         fprintf(stderr, "warning inotify_add_watch %s failed: %s\n",
                 pathname, strerror(errno));
