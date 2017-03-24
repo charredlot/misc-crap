@@ -20,7 +20,7 @@ struct file_watcher {
 
     char *pathname;
     int fd;
-    int watch_fd;
+    int wd;
     bool debug;
 };
 
@@ -69,7 +69,7 @@ file_watcher_alloc(const char *pathname, bool debug)
 
     fw->debug = debug;
     fw->fd = -1;
-    fw->watch_fd = -1;
+    fw->wd = -1;
 
     fw->pathname = strdup(pathname);
     if (fw->pathname == NULL) {
@@ -83,10 +83,10 @@ file_watcher_alloc(const char *pathname, bool debug)
         goto err;
     }
 
-    fw->watch_fd = inotify_add_watch(fw->fd, fw->pathname,
+    fw->wd = inotify_add_watch(fw->fd, fw->pathname,
                                      IN_DELETE_SELF | IN_MODIFY | IN_UNMOUNT |
                                      IN_MOVE_SELF);
-    if (fw->watch_fd < 0) {
+    if (fw->wd < 0) {
         fprintf(stderr, "warning inotify_add_watch %s failed: %s\n",
                 pathname, strerror(errno));
         // not fatal
@@ -105,9 +105,6 @@ file_watcher_free(struct file_watcher *fw)
     if (fw != NULL) {
         if (fw->fd >= 0) {
             close(fw->fd);
-        }
-        if (fw->watch_fd >= 0) {
-            close(fw->watch_fd);
         }
         if (fw->pathname != NULL) {
             free(fw->pathname);
@@ -169,10 +166,10 @@ file_watcher_read_event(struct file_watcher *fw)
 int
 file_watcher_wait_write(struct file_watcher *fw)
 {
-    if (fw->watch_fd < 0) {
-        fw->watch_fd = inotify_add_watch(fw->fd, fw->pathname,
+    if (fw->wd < 0) {
+        fw->wd = inotify_add_watch(fw->fd, fw->pathname,
                                          IN_DELETE_SELF | IN_MODIFY);
-        if (fw->watch_fd < 0) {
+        if (fw->wd < 0) {
             fprintf(stderr, "inotify_add_watch %s failed: %s\n",
                     fw->pathname, strerror(errno));
             return -1;
@@ -203,8 +200,7 @@ file_watcher_wait_write(struct file_watcher *fw)
          * also, not sure what to do for IN_Q_OVERFLOW
          */
         if ((event->mask & FATAL_MASK) != 0) {
-            close(fw->watch_fd);
-            fw->watch_fd = -1;
+            fw->wd = -1;
             return -1;
         }
 
