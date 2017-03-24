@@ -23,15 +23,17 @@ struct file_watcher {
     int wd;
     bool debug;
 };
-
 struct flag_to_char {
     uint32_t flag;
     char c;
 };
 
+#define WATCH_MASK (IN_DELETE_SELF | IN_MODIFY | IN_UNMOUNT | IN_MOVE_SELF)
+
 #define FATAL_MASK (IN_CLOSE_WRITE | IN_IGNORED | IN_DELETE_SELF | \
                     IN_MOVE_SELF | IN_UNMOUNT)
 static const struct flag_to_char flags_to_char[] = {
+    {IN_DELETE, 'd'},
     {IN_DELETE_SELF, 'D'},
     {IN_IGNORED, 'I'},
     {IN_MODIFY, 'M'},
@@ -83,9 +85,7 @@ file_watcher_alloc(const char *pathname, bool debug)
         goto err;
     }
 
-    fw->wd = inotify_add_watch(fw->fd, fw->pathname,
-                                     IN_DELETE_SELF | IN_MODIFY | IN_UNMOUNT |
-                                     IN_MOVE_SELF);
+    fw->wd = inotify_add_watch(fw->fd, fw->pathname, WATCH_MASK);
     if (fw->wd < 0) {
         fprintf(stderr, "warning inotify_add_watch %s failed: %s\n",
                 pathname, strerror(errno));
@@ -167,8 +167,7 @@ int
 file_watcher_wait_write(struct file_watcher *fw)
 {
     if (fw->wd < 0) {
-        fw->wd = inotify_add_watch(fw->fd, fw->pathname,
-                                         IN_DELETE_SELF | IN_MODIFY);
+        fw->wd = inotify_add_watch(fw->fd, fw->pathname, WATCH_MASK);
         if (fw->wd < 0) {
             fprintf(stderr, "inotify_add_watch %s failed: %s\n",
                     fw->pathname, strerror(errno));
