@@ -16,7 +16,7 @@ class Decl(object):
     def add_caller(self, decl):
         self.callers[decl.name] = decl
 
-    def print_tree(self, depth=0):
+    def print_tree(self, depth=None, abridged=False):
         l = [self.name]
 
         # format shamelessly cribbed from asciitree
@@ -25,17 +25,21 @@ class Decl(object):
             for i, (name, caller) in enumerate(node.callers.items()):
                 if name in parent_set:
                     # don't infinite loop for e.g. recursive functions
+                    lines.append("{}+-- {}**".format(indent, name))
                     continue
 
 
                 lines.append("{}+-- {}".format(indent, name))
-                new_set = parent_set.copy()
-                new_set.add(name)
                 if i + 1 == length:
                     new_indent = indent + "    "
                 else:
                     new_indent = indent + "|   "
-                if depth == 0 or curr_depth < depth:
+                if depth is None or curr_depth < depth:
+                    if abridged:
+                        new_set = parent_set
+                    else:
+                        new_set = parent_set.copy()
+                    new_set.add(name)
                     recurse_print(caller, lines, new_set, new_indent,
                                   curr_depth + 1)
 
@@ -114,9 +118,19 @@ def _ast_files(d):
 
 def _ast_files_to_calls(directory):
     index = Index(conf.lib.clang_createIndex(False, True))
-    units = [(os.path.abspath(path),
-              TranslationUnit.from_ast_file(path, index))
-             for path in _ast_files(directory)]
+
+    # don't list comprehend so we can get better error reporting
+    units = []
+    for path in _ast_files(directory):
+        try:
+            units.append((os.path.abspath(path),
+                          TranslationUnit.from_ast_file(path, index)))
+        except Exception as e:
+            print("error parsing {}".format(path))
+            print(e.args)
+            print(e.message)
+            raise
+
     c = Calls()
 
     for path, tu in units:
@@ -152,8 +166,11 @@ def main():
     parser.add_argument('-f', '--function', dest='function', required=False,
                         help='function name to generate call graph for')
     parser.add_argument('--depth', dest='depth', required=False,
-                        type=int, default=0,
+                        type=int, default=None,
                         help='how many calls deep to print')
+    parser.add_argument('--abridged', dest='abridged', required=False,
+                        action='store_true',
+                        help='abridge repeated parts of tree')
     args = parser.parse_args()
     _default_cache_filename = "print_callers.json"
 
@@ -178,7 +195,7 @@ def main():
     if args.function:
         for name, decl in calls.decls.items():
             if name == args.function:
-                decl.print_tree(args.depth)
+                decl.print_tree(args.depth, args.abridged)
     else:
         print("no function specified to print call tree")
 
