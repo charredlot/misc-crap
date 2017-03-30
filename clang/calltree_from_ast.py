@@ -55,7 +55,7 @@ class Decl(object):
         return "{}".format(self.name)
 
 
-class Calls(object):
+class CallInfo(object):
     def __init__(self):
         self.decls = dict()
         self._globals = dict()
@@ -105,16 +105,16 @@ class Calls(object):
         if not callers:
             raise Exception("No 'callers' object found")
 
-        calls = Calls()
+        ci = CallInfo()
         for name, decl_callers in callers.items():
             # might have been created by a previous decl who calls this func
-            decl = calls.decls.get(name, Decl(name))
+            decl = ci.decls.get(name, Decl(name))
             for caller_name in decl_callers:
-                caller_decl = calls.decls.get(caller_name, Decl(caller_name))
+                caller_decl = ci.decls.get(caller_name, Decl(caller_name))
                 decl.add_caller(caller_decl)
-                calls.decls[caller_name] = caller_decl
-            calls.decls[name] = decl
-        return calls
+                ci.decls[caller_name] = caller_decl
+            ci.decls[name] = decl
+        return ci
 
 
 def _ast_files(d):
@@ -125,7 +125,7 @@ def _ast_files(d):
             yield os.path.join(root, f)
 
 
-def _ast_files_to_calls(directory):
+def _ast_files_to_callinfo(directory):
     index = Index(conf.lib.clang_createIndex(False, True))
 
     # don't list comprehend so we can get better error reporting
@@ -140,7 +140,7 @@ def _ast_files_to_calls(directory):
             print(e.message)
             raise
 
-    c = Calls()
+    ci = CallInfo()
 
     for path, tu in units:
         for cursor in tu.cursor.get_children():
@@ -148,7 +148,7 @@ def _ast_files_to_calls(directory):
             # stuff from includes has the include's filename
             if ((cursor.kind == CursorKind.VAR_DECL) and
                 (cursor.location.file.name == tu.spelling)):
-                c.add_global(cursor)
+                ci.add_global(cursor)
 
     for path, tu in units:
         # WARNING: this will fail silently and unexpectedly if
@@ -159,9 +159,9 @@ def _ast_files_to_calls(directory):
         for cursor in tu.cursor.get_children():
             if (cursor.kind == CursorKind.FUNCTION_DECL or
                 cursor.kind == CursorKind.VAR_DECL):
-                decl = c.add_decl(cursor)
-                c.walk_decl(cursor, decl)
-    return c
+                decl = ci.add_decl(cursor)
+                ci.walk_decl(cursor, decl)
+    return ci
 
 
 def main():
@@ -184,12 +184,12 @@ def main():
     _default_cache_filename = "print_callers.json"
 
     if args.directory:
-        calls = _ast_files_to_calls(args.directory)
+        ci = _ast_files_to_callinfo(args.directory)
     elif args.input:
-        calls = Calls.load(args.input)
+        ci = CallInfo.load(args.input)
     else:
         try:
-            calls = Calls.load(_default_cache_filename)
+            ci = CallInfo.load(_default_cache_filename)
         except Exception:
             print("Need either a previously generated cache file to input or a"
                   " directory of .ast files from clang")
@@ -197,12 +197,12 @@ def main():
 
     if args.directory:
         if args.output:
-            calls.dump(args.output)
+            ci.dump(args.output)
         else:
-            calls.dump(_default_cache_filename)
+            ci.dump(_default_cache_filename)
 
     if args.function:
-        decl = calls.decls.get(args.function)
+        decl = ci.decls.get(args.function)
         if decl:
             decl.print_callers(args.depth, args.abridged)
         else:
