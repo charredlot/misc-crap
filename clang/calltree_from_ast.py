@@ -12,9 +12,17 @@ class Decl(object):
     def __init__(self, name):
         self.name = name
         self.callers = dict()
+        self.calls = dict()
+
+    def add_call(self, decl):
+        self.calls[decl.name] = decl
 
     def add_caller(self, decl):
         self.callers[decl.name] = decl
+
+    def print_calls(self, depth=None, abridged=False):
+        print("Calls:")
+        self.print_tree(lambda node: node.calls, depth, abridged)
 
     def print_callers(self, depth=None, abridged=False):
         print("Callers:")
@@ -27,12 +35,11 @@ class Decl(object):
         def recurse_print(node, lines, parent_set, indent, curr_depth):
             children = get_children(node)
             length = len(children)
-            for i, (name, caller) in enumerate(children.items()):
+            for i, (name, child_node) in enumerate(children.items()):
                 if name in parent_set:
                     # don't infinite loop for e.g. recursive functions
                     lines.append("{}+-- {}**".format(indent, name))
                     continue
-
 
                 lines.append("{}+-- {}".format(indent, name))
                 if i + 1 == length:
@@ -45,7 +52,7 @@ class Decl(object):
                     else:
                         new_set = parent_set.copy()
                     new_set.add(name)
-                    recurse_print(caller, lines, new_set, new_indent,
+                    recurse_print(child_node, lines, new_set, new_indent,
                                   curr_depth + 1)
 
         recurse_print(self, l, set(), "", 0)
@@ -67,13 +74,20 @@ class CallInfo(object):
         name = cursor.spelling
         return self.decls.setdefault(name, Decl(name))
 
+    def get_or_create_decl(self, name):
+        decl = self.decls.get(name)
+        if not decl:
+            decl = Decl(name)
+            self.decls[name] = decl
+        return decl
+
     def walk_decl(self, cursor, decl):
+        call_func = None
         if ((cursor.kind == CursorKind.CALL_EXPR) or
            (cursor.kind == CursorKind.DECL_REF_EXPR and
             (cursor.type.kind == TypeKind.FUNCTIONNOPROTO or
              cursor.type.kind == TypeKind.FUNCTIONPROTO))):
             call_func = self.add_decl(cursor)
-            call_func.add_caller(decl)
         elif cursor.kind == CursorKind.DECL_REF_EXPR:
             # this is for if you stick a function ptr in a global variable
             # this probably doesn't catch every case
@@ -81,7 +95,12 @@ class CallInfo(object):
             match = self._globals.get(parent.get_usr())
             if match:
                 call_func = self.add_decl(match)
-                call_func.add_caller(decl)
+
+        if call_func and call_func.name:
+            # TODO: locals won't have a cursor.spelling..should probably
+            # figure out a better way to find if a cursor is a local var
+            call_func.add_caller(decl)
+            decl.add_call(call_func)
 
         for child in cursor.get_children():
             self.walk_decl(child, decl)
@@ -89,10 +108,12 @@ class CallInfo(object):
     def dump(self, filename):
         sys.stderr.write("saving output to {}\n".format(filename))
         sys.stderr.flush()
+        calls = {name: list(decl.calls.keys())
+                 for name, decl in self.decls.items()}
         callers = {name: list(decl.callers.keys())
                    for name, decl in self.decls.items()}
         with open(filename, "w") as f:
-            json.dump({'callers': callers}, f)
+            json.dump({'callers': callers, "calls": calls}, f)
 
     @classmethod
     def load(cls, filename):
@@ -101,19 +122,25 @@ class CallInfo(object):
         with open(filename, "r") as f:
             d = json.load(f)
 
+        calls = d.get('calls')
         callers = d.get('callers')
         if not callers:
-            raise Exception("No 'callers' object found")
+            raise Exception("No 'calls' or 'callers' object found")
 
         ci = CallInfo()
         for name, decl_callers in callers.items():
             # might have been created by a previous decl who calls this func
-            decl = ci.decls.get(name, Decl(name))
+            decl = ci.get_or_create_decl(name)
             for caller_name in decl_callers:
-                caller_decl = ci.decls.get(caller_name, Decl(caller_name))
+                caller_decl = ci.get_or_create_decl(caller_name)
                 decl.add_caller(caller_decl)
                 ci.decls[caller_name] = caller_decl
-            ci.decls[name] = decl
+
+            decl_calls = calls.get(name)
+            if decl_calls:
+                for call_name in decl_calls:
+                    call_decl = ci.get_or_create_decl(call_name)
+                    decl.add_call(call_decl)
         return ci
 
 
@@ -180,6 +207,9 @@ def main():
     parser.add_argument('--abridged', dest='abridged', required=False,
                         action='store_true',
                         help='abridge repeated parts of tree')
+    parser.add_argument('--callers', dest='callers', required=False,
+                        action='store_true',
+                        help='print callers instead of calls')
     args = parser.parse_args()
     _default_cache_filename = "print_callers.json"
 
@@ -204,7 +234,10 @@ def main():
     if args.function:
         decl = ci.decls.get(args.function)
         if decl:
-            decl.print_callers(args.depth, args.abridged)
+            if args.callers:
+                decl.print_callers(args.depth, args.abridged)
+            else:
+                decl.print_calls(args.depth, args.abridged)
         else:
             print("function {} not found".format(args.function))
     else:
