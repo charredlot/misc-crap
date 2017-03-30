@@ -16,13 +16,18 @@ class Decl(object):
     def add_caller(self, decl):
         self.callers[decl.name] = decl
 
-    def print_tree(self, depth=None, abridged=False):
+    def print_callers(self, depth=None, abridged=False):
+        print("Callers:")
+        self.print_tree(lambda node: node.callers, depth, abridged)
+
+    def print_tree(self, get_children, depth=None, abridged=False):
         l = [self.name]
 
         # format shamelessly cribbed from asciitree
         def recurse_print(node, lines, parent_set, indent, curr_depth):
-            length = len(node.callers)
-            for i, (name, caller) in enumerate(node.callers.items()):
+            children = get_children(node)
+            length = len(children)
+            for i, (name, caller) in enumerate(children.items()):
                 if name in parent_set:
                     # don't infinite loop for e.g. recursive functions
                     lines.append("{}+-- {}**".format(indent, name))
@@ -84,10 +89,10 @@ class Calls(object):
     def dump(self, filename):
         sys.stderr.write("saving output to {}\n".format(filename))
         sys.stderr.flush()
-        d = {name: list(decl.callers.keys())
-             for name, decl in self.decls.items()}
+        callers = {name: list(decl.callers.keys())
+                   for name, decl in self.decls.items()}
         with open(filename, "w") as f:
-            json.dump(d, f)
+            json.dump({'callers': callers}, f)
 
     @classmethod
     def load(cls, filename):
@@ -95,8 +100,13 @@ class Calls(object):
         sys.stderr.flush()
         with open(filename, "r") as f:
             d = json.load(f)
+
+        callers = d.get('callers')
+        if not callers:
+            raise Exception("No 'callers' object found")
+
         calls = Calls()
-        for name, decl_callers in d.items():
+        for name, decl_callers in callers.items():
             # might have been created by a previous decl who calls this func
             decl = calls.decls.get(name, Decl(name))
             for caller_name in decl_callers:
@@ -192,9 +202,11 @@ def main():
             calls.dump(_default_cache_filename)
 
     if args.function:
-        for name, decl in calls.decls.items():
-            if name == args.function:
-                decl.print_tree(args.depth, args.abridged)
+        decl = calls.decls.get(args.function)
+        if decl:
+            decl.print_callers(args.depth, args.abridged)
+        else:
+            print("function {} not found".format(args.function))
     else:
         print("no function specified to print call tree")
 
