@@ -53,7 +53,6 @@ class Decl(object):
 class Calls(object):
     def __init__(self):
         self.decls = dict()
-        self.callers = dict()
         self._globals = dict()
 
     def add_global(self, cursor):
@@ -142,7 +141,7 @@ def _ast_files_to_calls(directory):
                 c.add_global(cursor)
 
     for path, tu in units:
-        # WARNING: this will fail silently and unexpectedly if 
+        # WARNING: this will fail silently and unexpectedly if
         # the version of clang that generated the .ast files is
         # different from the python clang library
         sys.stderr.write("  processing ast file {}\n".format(path))
@@ -177,7 +176,7 @@ def main():
     if args.directory:
         calls = _ast_files_to_calls(args.directory)
     elif args.input:
-        calls = Calls.load(args.input) 
+        calls = Calls.load(args.input)
     else:
         try:
             calls = Calls.load(_default_cache_filename)
@@ -187,7 +186,7 @@ def main():
         sys.exit(1)
 
     if args.directory:
-        if args.output: 
+        if args.output:
             calls.dump(args.output)
         else:
             calls.dump(_default_cache_filename)
