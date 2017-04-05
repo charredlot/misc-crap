@@ -207,7 +207,7 @@ def main():
     parser.add_argument('--abridged', dest='abridged', required=False,
                         action='store_true',
                         help='abridge repeated parts of tree')
-    parser.add_argument('--callers', dest='callers', required=False,
+    parser.add_argument('-c', '--callers', dest='callers', required=False,
                         action='store_true',
                         help='print callers instead of calls')
     args = parser.parse_args()
