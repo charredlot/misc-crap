@@ -20,42 +20,62 @@ class Decl(object):
     def add_caller(self, decl):
         self.callers[decl.name] = decl
 
-    def print_calls(self, depth=None, abridged=False):
-        print("Calls:")
-        self.print_tree(lambda node: node.calls, depth, abridged)
+    def print_calls(self, args):
+        self.print_tree(lambda node: node.calls, args)
 
-    def print_callers(self, depth=None, abridged=False):
-        print("Callers:")
-        self.print_tree(lambda node: node.callers, depth, abridged)
+    def print_callers(self, args):
+        self.print_tree(lambda node: node.callers, args)
 
-    def print_tree(self, get_children, depth=None, abridged=False):
+    def print_tree(self, get_children, args):
         l = [self.name]
 
+        depth = args.depth
+        leaves = args.leaves
+        abridged = args.abridged or leaves
+
         # format shamelessly cribbed from asciitree
-        def recurse_print(node, lines, parent_set, indent, curr_depth):
-            children = get_children(node)
+        def recurse_print(node, children,
+                          lines, parent_set, indent, curr_depth):
             length = len(children)
             for i, (name, child_node) in enumerate(children.items()):
+                grandchildren = get_children(child_node)
+                if leaves and grandchildren:
+                    parent_set.add(name)
+                    recurse_print(child_node, grandchildren,
+                                  lines, parent_set, indent,
+                                  curr_depth + 1)
+                    continue
+
                 if name in parent_set:
                     # don't infinite loop for e.g. recursive functions
-                    lines.append("{}+-- {}**".format(indent, name))
+                    if not leaves:
+                        lines.append("{}+-- {}**".format(indent, name))
                     continue
 
                 lines.append("{}+-- {}".format(indent, name))
+                parent_set.add(name)
+
+                if not grandchildren:
+                    continue
+
+                if depth is not None and curr_depth >= depth:
+                    continue
+
                 if i + 1 == length:
                     new_indent = indent + "    "
                 else:
                     new_indent = indent + "|   "
-                if depth is None or curr_depth < depth:
-                    if abridged:
-                        new_set = parent_set
-                    else:
-                        new_set = parent_set.copy()
-                    new_set.add(name)
-                    recurse_print(child_node, lines, new_set, new_indent,
-                                  curr_depth + 1)
 
-        recurse_print(self, l, set(), "", 0)
+                if abridged:
+                    new_set = parent_set
+                else:
+                    new_set = parent_set.copy()
+
+                recurse_print(child_node, grandchildren,
+                              lines, new_set, new_indent,
+                              curr_depth + 1)
+
+        recurse_print(self, get_children(self), l, set(), "", 0)
         print('\n'.join(l))
 
     def __str__(self):
@@ -211,8 +231,16 @@ def main():
     parser.add_argument('-c', '--callers', dest='callers', required=False,
                         action='store_true',
                         help='print callers instead of calls')
+    parser.add_argument('-l', '--leaves', dest='leaves', required=False,
+                        action='store_true',
+                        help='only print leaf functions')
     args = parser.parse_args()
     _default_cache_filename = "print_callers.json"
+
+    print("Printing function {}{}{}".format(
+            "callers" if args.callers else "calls",
+            ", skip duplicates" if args.abridged else "",
+            ", only leaf nodes" if args.leaves else ""))
 
     if args.directory:
         ci = _ast_files_to_callinfo(args.directory)
@@ -236,9 +264,9 @@ def main():
         decl = ci.decls.get(args.function)
         if decl:
             if args.callers:
-                decl.print_callers(args.depth, args.abridged)
+                decl.print_callers(args)
             else:
-                decl.print_calls(args.depth, args.abridged)
+                decl.print_calls(args)
         else:
             print("function {} not found".format(args.function))
     else:
