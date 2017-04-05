@@ -162,7 +162,8 @@ def _ast_files_to_callinfo(directory):
             units.append((os.path.abspath(path),
                           TranslationUnit.from_ast_file(path, index)))
         except Exception as e:
-            print("error parsing {}".format(path))
+            print("error parsing {}, python clang version might be different"
+                  "from compiled clang version?".format(path))
             print(e.args)
             print(e.message)
             raise
