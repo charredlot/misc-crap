@@ -31,7 +31,7 @@ class Decl(object):
 
         depth = args.depth
         leaves = args.leaves
-        abridged = args.abridged or leaves
+        prune = args.prune
 
         # format shamelessly cribbed from asciitree
         def recurse_print(node, children,
@@ -66,7 +66,7 @@ class Decl(object):
                 else:
                     new_indent = indent + "|   "
 
-                if abridged:
+                if prune:
                     new_set = parent_set
                 else:
                     new_set = parent_set.copy()
@@ -225,9 +225,9 @@ def main():
     parser.add_argument('--depth', dest='depth', required=False,
                         type=int, default=None,
                         help='how many calls deep to print')
-    parser.add_argument('--abridged', dest='abridged', required=False,
+    parser.add_argument('-p', '--prune', dest='prune', required=False,
                         action='store_true',
-                        help='abridge repeated parts of tree')
+                        help='prune duplicate branches of tree')
     parser.add_argument('-c', '--callers', dest='callers', required=False,
                         action='store_true',
                         help='print callers instead of calls')
@@ -239,7 +239,7 @@ def main():
 
     print("Printing function {}{}{}".format(
             "callers" if args.callers else "calls",
-            ", skip duplicates" if args.abridged else "",
+            ", prune duplicates (marked with **)" if args.prune else "",
             ", only leaf nodes" if args.leaves else ""))
 
     if args.directory:
