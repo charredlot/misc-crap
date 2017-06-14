@@ -252,7 +252,7 @@ def main():
         except Exception:
             print("Need either a previously generated cache file to input or a"
                   " directory of .ast files from clang")
-        sys.exit(1)
+            sys.exit(1)
 
     if args.directory:
         if args.output:
