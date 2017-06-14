@@ -235,7 +235,10 @@ def main():
                         action='store_true',
                         help='only print leaf functions')
     args = parser.parse_args()
-    _default_cache_filename = "print_callers.json"
+    if args.callers:
+        _default_cache_filename = "callers_cache.json"
+    else:
+        _default_cache_filename = "calls_cache.json"
 
     print("Printing function {}{}{}".format(
             "callers" if args.callers else "calls",
