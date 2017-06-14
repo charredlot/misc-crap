@@ -222,7 +222,7 @@ def main():
                         help='input JSON file of cached call graphs')
     parser.add_argument('-f', '--function', dest='function', required=False,
                         help='function name to generate call graph for')
-    parser.add_argument('--depth', dest='depth', required=False,
+    parser.add_argument('-n', '--depth', dest='depth', required=False,
                         type=int, default=None,
                         help='how many calls deep to print')
     parser.add_argument('-p', '--prune', dest='prune', required=False,
