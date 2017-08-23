@@ -12,3 +12,36 @@ pub fn bytes_to_hex(buf: &[u8]) -> String {
     }
     s
 }
+
+fn byte_to_nibble(c: u8) -> u8 {
+    match c as char {
+        '0' => 0,
+        '1' => 1,
+        '2' => 2,
+        '3' => 3,
+        '4' => 4,
+        '5' => 5,
+        '6' => 6,
+        '7' => 7,
+        '8' => 8,
+        '9' => 9,
+        'a' | 'A' => 10,
+        'b' | 'B' => 11,
+        'c' | 'C' => 12,
+        'd' | 'D' => 13,
+        'e' | 'E' => 14,
+        'f' | 'F' => 15,
+        _ => 255,
+    }
+}
+
+pub fn hex_to_bytes(s: &str) -> Vec<u8> {
+    // XXX: return reasonable errors
+    assert!(s.len() % 2 == 0, "hex string length should be an even number");
+    let mut vec = Vec::with_capacity(s.len() / 2);
+    for pair in s.as_bytes().chunks(2) {
+        // XXX: return errors
+        vec.push((byte_to_nibble(pair[0]) << 4) + byte_to_nibble(pair[1]));
+    }
+    vec
+}
