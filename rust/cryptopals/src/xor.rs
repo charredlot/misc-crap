@@ -1,4 +1,6 @@
 use std::cmp;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::str;
 use hex::{bytes_to_hex, hex_to_bytes};
 
@@ -72,6 +74,46 @@ pub fn decrypt_byte_xor_cipher(buf: &[u8]) -> (Vec<u8>, u8, u64) {
     (vec, low_key, low_score)
 }
 
+/// Returns best_decrypted_line, best_line_number
+fn detect_byte_xor_cipher(filename: &str) -> (Vec<u8>, usize) {
+    let f = match File::open(filename) {
+        Ok(file) => file,
+        Err(e) => { panic!("{}", e); }
+    };
+
+    let mut best_score: u64 = u64::max_value();
+    let mut best_lineno: usize = 0;
+    let mut best_result: Vec<u8> = Vec::new();
+
+    let buffered = BufReader::new(&f);
+    for (i, line) in buffered.lines().enumerate() {
+        let l = match line {
+            Ok(line_str) => line_str,
+            Err(e) => { panic!("{}", e); }
+        };
+
+        let line_bytes = hex_to_bytes(&l);
+        let (decrypted_bytes, _, score) = decrypt_byte_xor_cipher(&line_bytes);
+        if score >= best_score {
+            // XXX: same score?
+            continue;
+        }
+
+        match str::from_utf8(&decrypted_bytes) {
+            Ok(decrypted) => {
+                println!("  line {} {}: {}", i, score, decrypted);
+            },
+            // some strings won't be valid utf8
+            Err(_) => continue,
+        };
+
+        best_score = score;
+        best_lineno = i;
+        best_result = decrypted_bytes;
+    }
+    (best_result, best_lineno)
+}
+
 fn fixed_xor_test() {
     let buf = hex_to_bytes("1c0111001f010100061a024b53535009181c");
     let key = hex_to_bytes("686974207468652062756c6c277320657965");
@@ -104,8 +146,24 @@ fn byte_xor_cipher_test(ciphertext: &str, plaintext: &str) {
     }
 }
 
+fn detect_byte_xor_cipher_test() {
+    let expected_result: &str = "Now that the party is jumping\n";
+    let expected_lineno: usize = 170;
+    let (best_result_vec, best_lineno) = detect_byte_xor_cipher("data/1.4.txt");
+
+    let best_result = str::from_utf8(&best_result_vec).unwrap();
+    if best_result == expected_result && best_lineno == expected_lineno {
+        println!("Finished detect_byte_xor_cipher_test")
+    } else {
+        println!("ERROR in detect_byte_xor_cipher_test:");
+        println!("  expected line {}: {}", expected_lineno, expected_result);
+        println!("  got      line {}: {}", best_lineno, best_result);
+    }
+}
+
 pub fn xor_test() {
     fixed_xor_test();
     byte_xor_cipher_test("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736",
                          "Cooking MC's like a pound of bacon");
+    detect_byte_xor_cipher_test()
 }
