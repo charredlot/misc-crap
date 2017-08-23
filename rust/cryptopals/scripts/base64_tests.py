@@ -5,8 +5,8 @@ import binascii
 import os
 
 fmt = """
-    base64Test {{
-        bytes: {},
+    Base64Test {{
+        bytes: &{},
         encoded: "{}",
     }},
 """.strip()

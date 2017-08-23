@@ -1,3 +1,5 @@
+use debug::bytes_to_hex;
+
 const BASE64_VAL_CHAR: [char; 64] = [
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
     'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
@@ -6,6 +8,60 @@ const BASE64_VAL_CHAR: [char; 64] = [
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
     '+', '/'
 ];
+
+struct Base64Test {
+    bytes: &'static [u8],
+    encoded: &'static str,
+}
+
+const BASE64_TESTS: &[Base64Test] = &[
+    Base64Test {
+        bytes: &[18],
+        encoded: "Eg==",
+    },
+    Base64Test {
+        bytes: &[175, 53],
+        encoded: "rzU=",
+    },
+    Base64Test {
+        bytes: &[251, 10, 224],
+        encoded: "+wrg",
+    },
+    Base64Test {
+        bytes: &[155, 218, 164, 88],
+        encoded: "m9qkWA==",
+    },
+    Base64Test {
+        bytes: &[73, 10, 149, 19, 64],
+        encoded: "SQqVE0A=",
+    },
+    Base64Test {
+        bytes: &[135, 139, 134, 95, 187, 71],
+        encoded: "h4uGX7tH",
+    },
+    Base64Test {
+        bytes: &[29, 119, 154, 13, 59, 255, 210],
+        encoded: "HXeaDTv/0g==",
+    },
+];
+
+pub fn base64_test() {
+    println!("Running {} base64 tests", BASE64_TESTS.len());
+    for t in BASE64_TESTS {
+        let s: String = base64_encode(t.bytes);
+            // XXX: couldn't get match without a match guard
+        if s == t.encoded {
+            continue;
+        } else {
+            println!("base64 encoding {}", bytes_to_hex(t.bytes));
+            println!("  expected {}", t.encoded);
+            println!("  got {}", s);
+            break;
+        }
+    }
+    println!("Finished base64 tests");
+}
+
 
 pub fn base64_encode(buf : &[u8]) -> String {
     let mut s = String::new();
