@@ -1,2 +1,3 @@
 pub mod base64;
-pub mod debug;
+pub mod hex;
+pub mod xor;

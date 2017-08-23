@@ -1,4 +1,4 @@
-use debug::bytes_to_hex;
+use hex::bytes_to_hex;
 
 const BASE64_VAL_CHAR: [char; 64] = [
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
