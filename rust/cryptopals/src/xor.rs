@@ -114,6 +114,14 @@ fn detect_byte_xor_cipher(filename: &str) -> (Vec<u8>, usize) {
     (best_result, best_lineno)
 }
 
+fn repeating_key_xor(s: &[u8], key: &[u8]) -> Vec<u8> {
+    let mut vec: Vec<u8> = Vec::with_capacity(s.len());
+    for (&b0, &b1) in s.iter().zip(key.iter().cycle()) {
+        vec.push(b0 ^ b1);
+    }
+    vec
+}
+
 fn fixed_xor_test() {
     let buf = hex_to_bytes("1c0111001f010100061a024b53535009181c");
     let key = hex_to_bytes("686974207468652062756c6c277320657965");
@@ -153,7 +161,7 @@ fn detect_byte_xor_cipher_test() {
 
     let best_result = str::from_utf8(&best_result_vec).unwrap();
     if best_result == expected_result && best_lineno == expected_lineno {
-        println!("Finished detect_byte_xor_cipher_test")
+        println!("Finished detect_byte_xor_cipher_test");
     } else {
         println!("ERROR in detect_byte_xor_cipher_test:");
         println!("  expected line {}: {}", expected_lineno, expected_result);
@@ -161,9 +169,30 @@ fn detect_byte_xor_cipher_test() {
     }
 }
 
+fn repeating_key_xor_test() {
+    let s = "Burning 'em, if you ain't quick and nimble\n\
+             I go crazy when I hear a cymbal";
+    let key = "ICE";
+    let expected = "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272\
+                    a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f";
+
+
+    let bytes = repeating_key_xor(s.as_bytes(), key.as_bytes());
+    let result = bytes_to_hex(bytes.as_slice());
+
+    if result == expected {
+        println!("Finished repeating_key_xor_test");
+    } else {
+        println!("ERROR repeating_key_xor_test:");
+        println!("  expected {}", expected);
+        println!("  got      {}", result);
+    }
+}
+
 pub fn xor_test() {
     fixed_xor_test();
     byte_xor_cipher_test("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736",
                          "Cooking MC's like a pound of bacon");
-    detect_byte_xor_cipher_test()
+    detect_byte_xor_cipher_test();
+    repeating_key_xor_test();
 }
