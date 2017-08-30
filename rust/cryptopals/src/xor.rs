@@ -46,8 +46,8 @@ fn english_freq_score(freqs: &[u64; 256], total: u64) -> u64 {
     score
 }
 
-/// Returns decrypted, key, score
-pub fn decrypt_byte_xor_cipher(buf: &[u8]) -> (Vec<u8>, u8, u64) {
+/// Returns key, score
+pub fn guess_byte_xor_cipher(buf: &[u8]) -> (u8, u64) {
     let mut low_score: u64 = u64::max_value();
     let mut low_key: u8 = 0;
 
@@ -67,11 +67,7 @@ pub fn decrypt_byte_xor_cipher(buf: &[u8]) -> (Vec<u8>, u8, u64) {
             low_key = key;
         }
     }
-    let mut vec = Vec::with_capacity(buf.len());
-    for &b in buf {
-        vec.push(b ^ low_key);
-    }
-    (vec, low_key, low_score)
+    (low_key, low_score)
 }
 
 /// Returns best_decrypted_line, best_line_number
@@ -93,12 +89,13 @@ fn detect_byte_xor_cipher(filename: &str) -> (Vec<u8>, usize) {
         };
 
         let line_bytes = hex_to_bytes(&l);
-        let (decrypted_bytes, _, score) = decrypt_byte_xor_cipher(&line_bytes);
+        let (key, score) = guess_byte_xor_cipher(&line_bytes);
         if score >= best_score {
             // XXX: same score?
             continue;
         }
 
+        let decrypted_bytes = repeating_key_xor(&line_bytes, &[key; 1]);
         match str::from_utf8(&decrypted_bytes) {
             Ok(decrypted) => {
                 println!("  line {} {}: {}", i, score, decrypted);
@@ -141,8 +138,9 @@ fn fixed_xor_test() {
 
 fn byte_xor_cipher_test(ciphertext: &str, plaintext: &str) {
     let cipher_bytes = hex_to_bytes(ciphertext);
-    let (decrypted_bytes, _, _) = decrypt_byte_xor_cipher(&cipher_bytes);
+    let (key, _) = guess_byte_xor_cipher(&cipher_bytes);
 
+    let decrypted_bytes = repeating_key_xor(&cipher_bytes, &[key; 1]);
     // this might panic?
     let decrypted = str::from_utf8(&decrypted_bytes).unwrap();
     if decrypted == plaintext {
