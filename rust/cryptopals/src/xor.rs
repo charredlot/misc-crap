@@ -114,7 +114,7 @@ fn detect_byte_xor_cipher(filename: &str) -> (Vec<u8>, usize) {
     (best_result, best_lineno)
 }
 
-fn repeating_key_xor(s: &[u8], key: &[u8]) -> Vec<u8> {
+pub fn repeating_key_xor(s: &[u8], key: &[u8]) -> Vec<u8> {
     let mut vec: Vec<u8> = Vec::with_capacity(s.len());
     for (&b0, &b1) in s.iter().zip(key.iter().cycle()) {
         vec.push(b0 ^ b1);
