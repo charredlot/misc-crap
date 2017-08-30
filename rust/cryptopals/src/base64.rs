@@ -1,3 +1,7 @@
+use std::fs::File;
+use std::io::BufReader;
+use std::io::prelude::*;
+use std::vec::Vec;
 use hex::bytes_to_hex;
 
 const BASE64_VAL_CHAR: [char; 64] = [
@@ -45,24 +49,6 @@ const BASE64_TESTS: &[Base64Test] = &[
     },
 ];
 
-pub fn base64_test() {
-    println!("Running {} base64 tests", BASE64_TESTS.len());
-    for t in BASE64_TESTS {
-        let s: String = base64_encode(t.bytes);
-            // XXX: couldn't get match without a match guard
-        if s == t.encoded {
-            continue;
-        } else {
-            println!("base64 encoding {}", bytes_to_hex(t.bytes));
-            println!("  expected {}", t.encoded);
-            println!("  got {}", s);
-            break;
-        }
-    }
-    println!("Finished base64 tests");
-}
-
-
 pub fn base64_encode(buf : &[u8]) -> String {
     let mut s = String::new();
     for chunk in buf.chunks(3) {
@@ -93,4 +79,90 @@ pub fn base64_encode(buf : &[u8]) -> String {
         }
     }
     s
+}
+
+fn base64_char_to_byte(c: u8) -> u8 {
+    const UPPER_A: u8 = 'A' as u8;
+    const UPPER_Z: u8 = 'Z' as u8;
+    const LOWER_A: u8 = 'a' as u8;
+    const LOWER_Z: u8 = 'z' as u8;
+    const DIGIT_0: u8 = '0' as u8;
+    const DIGIT_9: u8 = '9' as u8;
+    const PLUS: u8 = '+' as u8;
+    const SLASH: u8 = '/' as u8;
+    let res: u8 = match c {
+        UPPER_A...UPPER_Z => c - UPPER_A,
+        LOWER_A...LOWER_Z => (c - LOWER_A) + 26,
+        DIGIT_0...DIGIT_9 => (c - DIGIT_0) + 52,
+        PLUS => 62,
+        SLASH => 63,
+        // XXX: should error handle better
+        _ => {
+            panic!("got unexpected base64 byte {}", c as char);
+        }
+    };
+    res
+}
+
+pub fn base64_decode(s: &str) -> Vec<u8> {
+    assert!(s.len() % 4 == 0);
+    const EQUALS: u8 = '=' as u8;
+
+    let mut vec: Vec<u8> = Vec::new();
+    for chunk in s.as_bytes().chunks(4) {
+        let b0 = base64_char_to_byte(chunk[0]);
+        let b1 = base64_char_to_byte(chunk[1]);
+        vec.push((b0 << 2) | ((b1 >> 4) & 0b11));
+
+        if chunk[2] != EQUALS {
+            let b2 = base64_char_to_byte(chunk[2]);
+            vec.push(((b1 & 0b1111) << 4) | ((b2 >> 2) & 0b1111));
+
+            // XXX: error if 4th is EQUALS but 3rd is not
+            if chunk[3] != EQUALS {
+                let b3 = base64_char_to_byte(chunk[3]);
+                vec.push(((b2 & 0b11) << 6) | b3);
+            }
+        }
+    }
+    vec
+}
+
+pub fn base64_decode_file(filename: &str) -> Vec<u8> {
+    let f = match File::open(filename) {
+        Ok(file) => file,
+        Err(e) => { panic!("{}", e); },
+    };
+
+    let mut contents = String::new();
+    let mut buffered = BufReader::new(&f);
+    match buffered.read_to_string(&mut contents) {
+        Ok(_) => {},
+        Err(e) => { panic!("{}", e); },
+    };
+
+    base64_decode(contents.replace("\n", "").trim())
+}
+
+pub fn base64_test() {
+    println!("Running {} base64 tests", BASE64_TESTS.len());
+    for t in BASE64_TESTS {
+        let s: String = base64_encode(t.bytes);
+            // XXX: couldn't get match without a match guard
+        if s != t.encoded {
+            println!("ERROR base64 encoding {}", bytes_to_hex(t.bytes));
+            println!("  expected {}", t.encoded);
+            println!("  got {}", s);
+            panic!("ERROR base64 encoding");
+        }
+
+        let decoded = base64_decode(t.encoded);
+        if decoded != t.bytes {
+            println!("ERROR base64 decoding {}", t.encoded);
+            println!("  expected {:?}", t.bytes);
+            println!("  got {:?}", decoded);
+            panic!("ERROR base64 decoding");
+        }
+    }
+    println!("Finished base64 tests");
 }
