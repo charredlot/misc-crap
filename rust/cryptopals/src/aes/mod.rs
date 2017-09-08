@@ -1,5 +1,6 @@
 mod constants;
-use self::constants::{SBOX,INV_SBOX,GF256_MUL_2, GF256_MUL_3};
+use self::constants::{SBOX,INV_SBOX,GF256_MUL_2, GF256_MUL_3, GF256_MUL_9,
+                      GF256_MUL_11, GF256_MUL_13, GF256_MUL_14};
 use hex::{hex_to_bytes,bytes_to_hex};
 
 struct AESBlock {
@@ -36,6 +37,12 @@ impl AESBlock {
         }
     }
 
+    fn inv_sub_bytes(&mut self) {
+        for b in &mut self.values {
+            *b = INV_SBOX[*b as usize];
+        }
+    }
+
     fn shift_rows(&mut self) {
         let mut tmp = [0u8; 4];
 
@@ -60,6 +67,34 @@ impl AESBlock {
         tmp[1] = self.get(3, 0);
         tmp[2] = self.get(3, 1);
         tmp[3] = self.get(3, 2);
+        for i in 0..4 {
+            self.set(3, i, tmp[i]);
+        }
+    }
+
+    fn inv_shift_rows(&mut self) {
+        let mut tmp = [0u8; 4];
+
+        tmp[0] = self.get(1, 3);
+        tmp[1] = self.get(1, 0);
+        tmp[2] = self.get(1, 1);
+        tmp[3] = self.get(1, 2);
+        for i in 0..4 {
+            self.set(1, i, tmp[i]);
+        }
+
+        tmp[0] = self.get(2, 2);
+        tmp[1] = self.get(2, 3);
+        tmp[2] = self.get(2, 0);
+        tmp[3] = self.get(2, 1);
+        for i in 0..4 {
+            self.set(2, i, tmp[i]);
+        }
+
+        tmp[0] = self.get(3, 1);
+        tmp[1] = self.get(3, 2);
+        tmp[2] = self.get(3, 3);
+        tmp[3] = self.get(3, 0);
         for i in 0..4 {
             self.set(3, i, tmp[i]);
         }
@@ -93,11 +128,46 @@ impl AESBlock {
         }
     }
 
+    fn inv_mix_column(column: &mut [u8]) {
+        let tmp = [
+            GF256_MUL_14[column[0] as usize] ^
+            GF256_MUL_11[column[1] as usize] ^
+            GF256_MUL_13[column[2] as usize] ^
+            GF256_MUL_9[column[3] as usize],
+
+            GF256_MUL_9[column[0] as usize] ^
+            GF256_MUL_14[column[1] as usize] ^
+            GF256_MUL_11[column[2] as usize] ^
+            GF256_MUL_13[column[3] as usize],
+
+            GF256_MUL_13[column[0] as usize] ^
+            GF256_MUL_9[column[1] as usize] ^
+            GF256_MUL_14[column[2] as usize] ^
+            GF256_MUL_11[column[3] as usize],
+
+            GF256_MUL_11[column[0] as usize] ^
+            GF256_MUL_13[column[1] as usize] ^
+            GF256_MUL_9[column[2] as usize] ^
+            GF256_MUL_14[column[3] as usize],
+        ];
+
+        for (b, &nb) in column.iter_mut().zip(&tmp) {
+            *b = nb
+        }
+    }
+
     fn mix_columns(&mut self) {
         AESBlock::mix_column(&mut self.values[0..4]);
         AESBlock::mix_column(&mut self.values[4..8]);
         AESBlock::mix_column(&mut self.values[8..12]);
         AESBlock::mix_column(&mut self.values[12..16]);
+    }
+
+    fn inv_mix_columns(&mut self) {
+        AESBlock::inv_mix_column(&mut self.values[0..4]);
+        AESBlock::inv_mix_column(&mut self.values[4..8]);
+        AESBlock::inv_mix_column(&mut self.values[8..12]);
+        AESBlock::inv_mix_column(&mut self.values[12..16]);
     }
 }
 
@@ -194,6 +264,28 @@ impl AESState {
         state.sub_bytes();
         state.shift_rows();
         state.add_round_key(&self.key_schedule[self.rounds]);
+
+        state.values.to_vec()
+    }
+
+    fn decrypt_block(&self, plaintext: &[u8]) -> Vec<u8> {
+        let mut state = AESBlock::from_slice(plaintext);
+
+        // inverse final round
+        state.add_round_key(&self.key_schedule[self.rounds]);
+        state.inv_shift_rows();
+        state.inv_sub_bytes();
+
+
+        for i in (1..self.rounds).rev() {
+            state.add_round_key(&self.key_schedule[i]);
+            state.inv_mix_columns();
+            state.inv_shift_rows();
+            state.inv_sub_bytes();
+        }
+
+        // inverse initial round
+        state.add_round_key(&self.key_schedule[0]);
 
         state.values.to_vec()
     }
@@ -317,20 +409,26 @@ pub fn aes_test() {
     mix_columns_test();
 
     let encrypt_tests = [
-        ("59454c4c4f57205355424d4152494e45",
-         "626f6f70626f6f70626f6f70626f6f70",
-         "524086dcdd3fba9d571165a93e5bf91c",),
         ("000102030405060708090a0b0c0d0e0f",
          "00112233445566778899aabbccddeeff",
          "69c4e0d86a7b0430d8cdb78070b4c55a",),
+        ("59454c4c4f57205355424d4152494e45",
+         "626f6f70626f6f70626f6f70626f6f70",
+         "524086dcdd3fba9d571165a93e5bf91c",),
     ];
 
-    for &(key, plaintext, expected) in &encrypt_tests {
+    for &(key, plaintext, expected_ciphertext) in &encrypt_tests {
         let state = AESState::new(&hex_to_bytes(key));
         let ciphertext = state.encrypt_block(&hex_to_bytes(plaintext));
-        if ciphertext != hex_to_bytes(expected) {
+        if ciphertext != hex_to_bytes(expected_ciphertext) {
             panic!("FAILED: encrypt expected {} got {}",
-                   expected, bytes_to_hex(&ciphertext));
+                   expected_ciphertext, bytes_to_hex(&ciphertext));
+        }
+
+        let decrypted = state.decrypt_block(&ciphertext);
+        if decrypted != hex_to_bytes(plaintext) {
+            panic!("FAILED: decrypt expected {} got {}",
+                   plaintext, bytes_to_hex(&decrypted));
         }
     }
 }
