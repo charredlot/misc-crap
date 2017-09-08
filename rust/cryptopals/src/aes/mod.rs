@@ -1,5 +1,104 @@
 mod constants;
-use self::constants::SBOX;
+use self::constants::{SBOX,INV_SBOX,GF256_MUL_2, GF256_MUL_3};
+
+struct AESBlock {
+    values: [u8; 16],
+}
+
+impl AESBlock {
+    fn from_slice(values: &[u8]) -> AESBlock {
+        assert!(values.len() == 16);
+        let mut block = AESBlock {values: [0u8; 16]};
+        for (i, &b) in values.iter().enumerate() {
+            block.values[i] = b
+        }
+        block
+    }
+
+    fn set(&mut self, row: usize, col: usize, val: u8) {
+        self.values[col * 4 + row] = val;
+    }
+
+    fn get(&self, row: usize, col: usize) -> u8 {
+        self.values[col * 4 + row]
+    }
+
+    fn add_round_key(&mut self, key: &AESBlock) {
+        for (b, k) in self.values.iter_mut().zip(key.values.iter()) {
+            *b = *b ^ k;
+        }
+    }
+
+    fn sub_bytes(&mut self) {
+        for b in &mut self.values {
+            *b = SBOX[*b as usize];
+        }
+    }
+
+    fn shift_rows(&mut self) {
+        let mut tmp = [0u8; 4];
+
+        // XXX: arg this sucks, find better pattern
+        tmp[0] = self.get(1, 1);
+        tmp[1] = self.get(1, 2);
+        tmp[2] = self.get(1, 3);
+        tmp[3] = self.get(1, 0);
+        for i in 0..4 {
+            self.set(1, i, tmp[i]);
+        }
+
+        tmp[0] = self.get(2, 2);
+        tmp[1] = self.get(2, 3);
+        tmp[2] = self.get(2, 0);
+        tmp[3] = self.get(2, 1);
+        for i in 0..4 {
+            self.set(2, i, tmp[i]);
+        }
+
+        tmp[0] = self.get(3, 3);
+        tmp[1] = self.get(3, 0);
+        tmp[2] = self.get(3, 1);
+        tmp[3] = self.get(3, 2);
+        for i in 0..4 {
+            self.set(3, i, tmp[i]);
+        }
+    }
+
+    fn mix_column(column: &mut [u8]) {
+        let tmp = [
+            GF256_MUL_2[column[0] as usize] ^
+            GF256_MUL_3[column[1] as usize] ^
+            column[2] ^
+            column[3],
+
+            column[0] ^
+            GF256_MUL_2[column[1] as usize] ^
+            GF256_MUL_3[column[2] as usize] ^
+            column[3],
+
+            column[0] ^
+            column[1] ^
+            GF256_MUL_2[column[2] as usize] ^
+            GF256_MUL_3[column[3] as usize],
+
+            GF256_MUL_3[column[0] as usize] ^
+            column[1] ^
+            column[2] ^
+            GF256_MUL_2[column[3] as usize],
+        ];
+
+        for (b, &nb) in column.iter_mut().zip(&tmp) {
+            *b = nb
+        }
+    }
+
+    fn mix_columns(&mut self) {
+        AESBlock::mix_column(&mut self.values[0..4]);
+        AESBlock::mix_column(&mut self.values[4..8]);
+        AESBlock::mix_column(&mut self.values[8..12]);
+        AESBlock::mix_column(&mut self.values[12..16]);
+    }
+}
 
 pub struct AESState {
     expanded_key: Vec<u8>,
@@ -167,6 +266,38 @@ fn expand_key_test() {
     }
 }
 
+fn mix_columns_test() {
+    // from wiki
+    let tests = [
+        ([0xdbu8, 0x13u8, 0x53u8, 0x45u8],
+         [0x8eu8, 0x4du8, 0xa1u8, 0xbcu8]),
+        ([0xf2u8, 0x0au8, 0x22u8, 0x5cu8],
+         [0x9fu8, 0xdcu8, 0x58u8, 0x9du8]),
+        ([0x01u8, 0x01u8, 0x01u8, 0x01u8],
+         [0x01u8, 0x01u8, 0x01u8, 0x01u8]),
+        ([0xc6u8, 0xc6u8, 0xc6u8, 0xc6u8],
+         [0xc6u8, 0xc6u8, 0xc6u8, 0xc6u8]),
+        ([0xd4u8, 0xd4u8, 0xd4u8, 0xd5u8],
+         [0xd5u8, 0xd5u8, 0xd7u8, 0xd6u8]),
+        ([0x2du8, 0x26u8, 0x31u8, 0x4cu8],
+         [0x4du8, 0x7eu8, 0xbdu8, 0xf8u8]),
+    ];
+    for &(mut column, expected) in tests.iter() {
+        AESBlock::mix_column(&mut column);
+        if column != expected {
+            panic!("FAILED: mix_columns expected {:?} got {:?}",
+                   expected, column);
+        }
+    }
+}
+
 pub fn aes_test() {
+    // should end up as 'boopboopboopboop' with key 'YELLOW SUBMARINE'
+    let ciphertext = [0x52u8, 0x40u8, 0x86u8, 0xdcu8,
+                      0xddu8, 0x3fu8, 0xbau8, 0x9du8,
+                      0x57u8, 0x11u8, 0x65u8, 0xa9u8,
+                      0x3eu8, 0x5bu8, 0xf9u8, 0x1cu8,];
+
     expand_key_test();
+    mix_columns_test();
 }
