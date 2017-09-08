@@ -1,7 +1,9 @@
 mod constants;
 use self::constants::{SBOX,INV_SBOX,GF256_MUL_2, GF256_MUL_3, GF256_MUL_9,
                       GF256_MUL_11, GF256_MUL_13, GF256_MUL_14};
+use base64::base64_decode_file;
 use hex::{hex_to_bytes,bytes_to_hex};
+use std::str;
 
 struct AESBlock {
     values: [u8; 16],
@@ -289,6 +291,17 @@ impl AESState {
 
         state.values.to_vec()
     }
+
+    fn ecb_decrypt(&self, ciphertext: &[u8]) -> Vec<u8> {
+        let mut result: Vec<u8> = Vec::new();
+
+        for chunk in ciphertext.chunks(16) {
+            let mut block = self.decrypt_block(chunk);
+            result.append(&mut block)
+        }
+
+        result
+    }
 }
 
 fn rijndael_core(t: &mut [u8; 4], rcon_i: usize) {
@@ -431,4 +444,13 @@ pub fn aes_test() {
                    plaintext, bytes_to_hex(&decrypted));
         }
     }
+
+    let f = base64_decode_file("data/1.7.txt");
+    let state = AESState::new("YELLOW SUBMARINE".as_bytes());
+    let decrypted_bytes = state.ecb_decrypt(&f);
+    let pad = *decrypted_bytes.last().unwrap() as usize;
+    let decrypted = str::from_utf8(&decrypted_bytes[0..(decrypted_bytes.len() - pad)]).unwrap();
+    println!("AES ECB decrypt 1.7.txt:\n{}----", decrypted);
+
+    println!("Finished AES tests");
 }
