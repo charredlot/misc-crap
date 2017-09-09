@@ -3,6 +3,9 @@ use self::constants::{SBOX,INV_SBOX,GF256_MUL_2, GF256_MUL_3, GF256_MUL_9,
                       GF256_MUL_11, GF256_MUL_13, GF256_MUL_14};
 use base64::base64_decode_file;
 use hex::{hex_to_bytes,bytes_to_hex};
+use std::collections::HashSet;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::str;
 
 struct AESBlock {
@@ -403,6 +406,46 @@ fn mix_columns_test() {
     }
 }
 
+fn detect_aes_ecb(buf: &[u8]) -> u64 {
+    // XXX: length not multiple of block size
+    let mut score: u64 = 0;
+    let mut chunks: HashSet<&[u8]> = HashSet::new();
+    for chunk in buf.chunks(16) {
+        if chunks.contains(chunk) {
+            score += 1;
+        } else {
+            chunks.insert(chunk);
+        }
+    }
+    score
+}
+
+fn detect_aes_ecb_in_file(filename: &str) {
+    let f = match File::open(filename) {
+        Ok(file) => file,
+        Err(e) => { panic!("{}", e); }
+    };
+
+    let mut best_score: u64 = 0;
+    let mut best_i: usize = 0;
+
+    let buffered = BufReader::new(&f);
+    for (i, line) in buffered.lines().enumerate() {
+        let l = match line {
+            Ok(line_str) => line_str,
+            Err(e) => { panic!("{}", e); }
+        };
+
+        let score = detect_aes_ecb(l.as_bytes());
+        if score > best_score {
+            best_score = score;
+            best_i = i;
+        }
+    }
+
+    println!("AES ECB 1.8.txt best_score {} on line {}", best_score, best_i);
+}
+
 pub fn aes_test() {
     expand_key_test();
     mix_columns_test();
@@ -438,5 +481,6 @@ pub fn aes_test() {
     let decrypted = str::from_utf8(&decrypted_bytes[0..(decrypted_bytes.len() - pad)]).unwrap();
     println!("AES ECB decrypt 1.7.txt:\n{}----", decrypted);
 
+    detect_aes_ecb_in_file("data/1.8.txt");
     println!("Finished AES tests");
 }
