@@ -31,8 +31,8 @@ impl AESBlock {
         self.values[col * 4 + row]
     }
 
-    fn add_round_key(&mut self, key: &AESBlock) {
-        for (b, k) in self.values.iter_mut().zip(key.values.iter()) {
+    fn add_round_key(&mut self, key: &[u8]) {
+        for (b, k) in self.values.iter_mut().zip(key) {
             *b = *b ^ k;
         }
     }
@@ -164,7 +164,7 @@ impl AESBlock {
 }
 
 pub struct AESState {
-    key_schedule: Vec<AESBlock>,
+    key_schedule: Vec<Vec<u8>>,
     rounds: usize,
 }
 
@@ -188,7 +188,7 @@ impl AESState {
         }
     }
 
-    fn expand_key(key: &[u8]) -> Vec<AESBlock> {
+    fn expand_key(key: &[u8]) -> Vec<Vec<u8>> {
         // from the wiki for Rijndael key schedule
         let (n, b) = match key.len() {
             16 => (16, 176),
@@ -232,9 +232,9 @@ impl AESState {
             }
         }
 
-        let mut keys: Vec<AESBlock> = Vec::new();
+        let mut keys: Vec<Vec<u8>> = Vec::new();
         for chunk in expanded.chunks(16) {
-            keys.push(AESBlock::from_slice(chunk));
+            keys.push(chunk.to_vec());
         }
 
         keys
@@ -373,10 +373,10 @@ fn expand_key_test() {
 
     for &(key, expected) in &tests {
         let expanded = AESState::expand_key(&key);
-        for ((i, chunk), block) in expected.chunks(16).enumerate().zip(&expanded) {
-            if block.values != chunk {
+        for ((i, chunk), block) in expected.chunks(16).enumerate().zip(expanded) {
+            if block != chunk {
                 panic!("expand_key_test expected {:?} got {:?} at chunk {}",
-                       chunk, block.values, i);
+                       chunk, block, i);
             }
         }
     }
