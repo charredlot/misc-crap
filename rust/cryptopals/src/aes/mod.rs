@@ -45,46 +45,23 @@ impl AESBlock {
         }
     }
 
-    fn shift_rows(&mut self) {
+    fn ror_row(&mut self, row: usize, shift: usize) {
         let mut tmp = [0u8; 4];
 
         // XXX: arg this sucks, find better pattern
-        tmp[0] = self.get(1, 1);
-        tmp[1] = self.get(1, 2);
-        tmp[2] = self.get(1, 3);
-        tmp[3] = self.get(1, 0);
-        for i in 0..4 {
-            self.set(1, i, tmp[i]);
-        }
-
-        tmp[0] = self.get(2, 2);
-        tmp[1] = self.get(2, 3);
-        tmp[2] = self.get(2, 0);
-        tmp[3] = self.get(2, 1);
-        for i in 0..4 {
-            self.set(2, i, tmp[i]);
-        }
-
-        tmp[0] = self.get(3, 3);
-        tmp[1] = self.get(3, 0);
-        tmp[2] = self.get(3, 1);
-        tmp[3] = self.get(3, 2);
-        for i in 0..4 {
-            self.set(3, i, tmp[i]);
+        tmp[0] = self.get(row, (0 + shift) % 4);
+        tmp[1] = self.get(row, (1 + shift) % 4);
+        tmp[2] = self.get(row, (2 + shift) % 4);
+        tmp[3] = self.get(row, (3 + shift) % 4);
+        for (i, &b) in tmp.iter().enumerate() {
+            self.set(row, i, b);
         }
     }
 
-    fn inv_shift_rows(&mut self) {
+    fn shift_rows(&mut self) {
+        self.ror_row(1, 1);
+
         let mut tmp = [0u8; 4];
-
-        tmp[0] = self.get(1, 3);
-        tmp[1] = self.get(1, 0);
-        tmp[2] = self.get(1, 1);
-        tmp[3] = self.get(1, 2);
-        for i in 0..4 {
-            self.set(1, i, tmp[i]);
-        }
-
         tmp[0] = self.get(2, 2);
         tmp[1] = self.get(2, 3);
         tmp[2] = self.get(2, 0);
@@ -93,13 +70,22 @@ impl AESBlock {
             self.set(2, i, tmp[i]);
         }
 
-        tmp[0] = self.get(3, 1);
-        tmp[1] = self.get(3, 2);
-        tmp[2] = self.get(3, 3);
-        tmp[3] = self.get(3, 0);
+        self.ror_row(3, 3);
+    }
+
+    fn inv_shift_rows(&mut self) {
+        self.ror_row(1, 3);
+
+        let mut tmp = [0u8; 4];
+        tmp[0] = self.get(2, 2);
+        tmp[1] = self.get(2, 3);
+        tmp[2] = self.get(2, 0);
+        tmp[3] = self.get(2, 1);
         for i in 0..4 {
-            self.set(3, i, tmp[i]);
+            self.set(2, i, tmp[i]);
         }
+
+        self.ror_row(3, 1);
     }
 
     fn mix_column(column: &mut [u8]) {
