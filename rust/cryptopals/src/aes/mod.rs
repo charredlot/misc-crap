@@ -3,6 +3,7 @@ use self::constants::{SBOX,INV_SBOX,GF256_MUL_2, GF256_MUL_3, GF256_MUL_9,
                       GF256_MUL_11, GF256_MUL_13, GF256_MUL_14};
 use base64::base64_decode_file;
 use hex::{hex_to_bytes,bytes_to_hex};
+use pkcs::pkcs7_unpad;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -477,8 +478,7 @@ pub fn aes_test() {
     let f = base64_decode_file("data/1.7.txt");
     let state = AESState::new("YELLOW SUBMARINE".as_bytes());
     let decrypted_bytes = state.ecb_decrypt(&f);
-    let pad = *decrypted_bytes.last().unwrap() as usize;
-    let decrypted = str::from_utf8(&decrypted_bytes[0..(decrypted_bytes.len() - pad)]).unwrap();
+    let decrypted = str::from_utf8(pkcs7_unpad(&decrypted_bytes)).unwrap();
     println!("AES ECB decrypt 1.7.txt:\n{}----", decrypted);
 
     detect_aes_ecb_in_file("data/1.8.txt");
