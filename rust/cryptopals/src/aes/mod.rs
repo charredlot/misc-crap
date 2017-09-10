@@ -164,13 +164,13 @@ impl AESBlock {
     }
 }
 
-pub struct AESState {
+pub struct AESCipher {
     key_schedule: Vec<Vec<u8>>,
     rounds: usize,
 }
 
-impl AESState {
-    fn new(key: &[u8]) -> AESState {
+impl AESCipher {
+    fn new(key: &[u8]) -> AESCipher {
         let key_size = key.len();
 
         let rounds: usize = match key_size {
@@ -183,8 +183,8 @@ impl AESState {
         };
 
         // XXX: could pack encrypt/decrypt in a closure like go does?
-        AESState {
-            key_schedule: AESState::expand_key(key),
+        AESCipher {
+            key_schedule: AESCipher::expand_key(key),
             rounds: rounds,
         }
     }
@@ -390,7 +390,7 @@ fn expand_key_test() {
     ];
 
     for &(key, expected) in &tests {
-        let expanded = AESState::expand_key(&key);
+        let expanded = AESCipher::expand_key(&key);
         for ((i, chunk), block) in expected.chunks(16).enumerate().zip(expanded) {
             if block != chunk {
                 panic!("expand_key_test expected {:?} got {:?} at chunk {}",
@@ -467,8 +467,8 @@ fn detect_aes_ecb_in_file(filename: &str) {
 
 fn decrypt_aes_cbc_base64_file(filename: &str, key: &[u8], iv: &[u8]) {
     let f = base64_decode_file(filename);
-    let state = AESState::new(key);
-    let decrypted_bytes = state.cbc_decrypt(&f, iv);
+    let cipher = AESCipher::new(key);
+    let decrypted_bytes = cipher.cbc_decrypt(&f, iv);
     let decrypted = str::from_utf8(&pkcs7_unpad(&decrypted_bytes)).unwrap();
     println!("AES CBC decrypt {}:\n{}", filename, decrypted);
 }
@@ -487,14 +487,14 @@ pub fn aes_test() {
     ];
 
     for &(key, plaintext, expected_ciphertext) in &encrypt_tests {
-        let state = AESState::new(&hex_to_bytes(key));
-        let ciphertext = state.encrypt_block(&hex_to_bytes(plaintext));
+        let cipher = AESCipher::new(&hex_to_bytes(key));
+        let ciphertext = cipher.encrypt_block(&hex_to_bytes(plaintext));
         if ciphertext != hex_to_bytes(expected_ciphertext) {
             panic!("FAILED: encrypt expected {} got {}",
                    expected_ciphertext, bytes_to_hex(&ciphertext));
         }
 
-        let decrypted = state.decrypt_block(&ciphertext);
+        let decrypted = cipher.decrypt_block(&ciphertext);
         if decrypted != hex_to_bytes(plaintext) {
             panic!("FAILED: decrypt expected {} got {}",
                    plaintext, bytes_to_hex(&decrypted));
@@ -502,8 +502,8 @@ pub fn aes_test() {
     }
 
     let f = base64_decode_file("data/1.7.txt");
-    let state = AESState::new("YELLOW SUBMARINE".as_bytes());
-    let decrypted_bytes = state.ecb_decrypt(&f);
+    let cipher = AESCipher::new("YELLOW SUBMARINE".as_bytes());
+    let decrypted_bytes = cipher.ecb_decrypt(&f);
     let decrypted = str::from_utf8(pkcs7_unpad(&decrypted_bytes)).unwrap();
     println!("AES ECB decrypt 1.7.txt:\n{}----", decrypted);
 
