@@ -4,6 +4,7 @@ use self::constants::{SBOX,INV_SBOX,GF256_MUL_2, GF256_MUL_3, GF256_MUL_9,
 use base64::base64_decode_file;
 use hex::{hex_to_bytes,bytes_to_hex};
 use pkcs::pkcs7_unpad;
+use xor::fixed_xor;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -292,6 +293,23 @@ impl AESState {
 
         result
     }
+
+    fn cbc_decrypt(&self, ciphertext: &[u8], init_iv: &[u8]) -> Vec<u8> {
+        assert!(init_iv.len() == 16);
+        // XXX: a way to do this without creating an extra vec?
+        let mut iv = [0u8; 16];
+        for (dst, src) in iv.iter_mut().zip(init_iv) {
+            *dst = *src;
+        }
+        let mut result: Vec<u8> = Vec::new();
+        for block in ciphertext.chunks(16) {
+            result.append(&mut fixed_xor(&self.decrypt_block(block), &iv));
+            for (dst, src) in iv.iter_mut().zip(block) {
+                *dst = *src;
+            }
+        }
+        result
+    }
 }
 
 fn rijndael_core(t: &mut [u8; 4], rcon_i: usize) {
@@ -447,6 +465,14 @@ fn detect_aes_ecb_in_file(filename: &str) {
     println!("AES ECB 1.8.txt best_score {} on line {}", best_score, best_i);
 }
 
+fn decrypt_aes_cbc_base64_file(filename: &str, key: &[u8], iv: &[u8]) {
+    let f = base64_decode_file(filename);
+    let state = AESState::new(key);
+    let decrypted_bytes = state.cbc_decrypt(&f, iv);
+    let decrypted = str::from_utf8(&pkcs7_unpad(&decrypted_bytes)).unwrap();
+    println!("AES CBC decrypt {}:\n{}", filename, decrypted);
+}
+
 pub fn aes_test() {
     expand_key_test();
     mix_columns_test();
@@ -482,5 +508,9 @@ pub fn aes_test() {
     println!("AES ECB decrypt 1.7.txt:\n{}----", decrypted);
 
     detect_aes_ecb_in_file("data/1.8.txt");
+
+    decrypt_aes_cbc_base64_file("data/2.10.txt",
+                                "YELLOW SUBMARINE".as_bytes(),
+                                &[0u8; 16]);
     println!("Finished AES tests");
 }
