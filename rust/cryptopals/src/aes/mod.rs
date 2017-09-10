@@ -283,6 +283,17 @@ impl AESCipher {
         state.values.to_vec()
     }
 
+    fn ecb_encrypt(&self, plaintext: &[u8]) -> Vec<u8> {
+        let mut result: Vec<u8> = Vec::new();
+
+        for chunk in plaintext.chunks(16) {
+            let mut block = self.encrypt_block(chunk);
+            result.append(&mut block)
+        }
+
+        result
+    }
+
     fn ecb_decrypt(&self, ciphertext: &[u8]) -> Vec<u8> {
         let mut result: Vec<u8> = Vec::new();
 
@@ -291,6 +302,25 @@ impl AESCipher {
             result.append(&mut block)
         }
 
+        result
+    }
+
+    fn cbc_encrypt(&self, plaintext: &[u8], init_iv: &[u8]) -> Vec<u8> {
+        assert!(init_iv.len() == 16);
+        // XXX: a way to do this without creating an extra vec?
+        let mut iv = [0u8; 16];
+        for (dst, src) in iv.iter_mut().zip(init_iv) {
+            *dst = *src;
+        }
+        let mut result: Vec<u8> = Vec::new();
+        for block in plaintext.chunks(16) {
+            let mixed = fixed_xor(block, &iv);
+            let encrypted = self.encrypt_block(&mixed);
+            result.extend(encrypted.iter().cloned());
+            for (dst, src) in iv.iter_mut().zip(&encrypted) {
+                *dst = *src;
+            }
+        }
         result
     }
 
