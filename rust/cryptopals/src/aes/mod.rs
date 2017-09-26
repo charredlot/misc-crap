@@ -7,7 +7,7 @@ use self::detect::distinguish_aes_cbc_ecb_test;
 use self::ecb_decrypt::decrypt_aes_ecb_simple_test;
 use base64::base64_decode_file;
 use hex::{hex_to_bytes,bytes_to_hex};
-use pkcs::pkcs7_unpad;
+use pkcs::{pkcs7_pad,pkcs7_unpad};
 use xor::fixed_xor;
 use std::collections::HashSet;
 use std::fs::File;
@@ -174,7 +174,7 @@ pub struct AESCipher {
 }
 
 impl AESCipher {
-    fn new(key: &[u8]) -> AESCipher {
+    pub fn new(key: &[u8]) -> AESCipher {
         let key_size = key.len();
 
         let rounds: usize = match key_size {
@@ -298,7 +298,11 @@ impl AESCipher {
         result
     }
 
-    fn ecb_decrypt(&self, ciphertext: &[u8]) -> Vec<u8> {
+    pub fn ecb_pad_and_encrypt(&self, plaintext: &[u8]) -> Vec<u8> {
+        self.ecb_encrypt(&pkcs7_pad(plaintext, 16))
+    }
+
+    pub fn ecb_decrypt(&self, ciphertext: &[u8]) -> Vec<u8> {
         let mut result: Vec<u8> = Vec::new();
 
         for chunk in ciphertext.chunks(16) {
@@ -309,7 +313,11 @@ impl AESCipher {
         result
     }
 
-    fn cbc_encrypt(&self, plaintext: &[u8], init_iv: &[u8]) -> Vec<u8> {
+    pub fn ecb_decrypt_and_unpad(&self, ciphertext: &[u8]) -> Vec<u8> {
+        pkcs7_unpad(&self.ecb_decrypt(ciphertext)).to_vec()
+    }
+
+    pub fn cbc_encrypt(&self, plaintext: &[u8], init_iv: &[u8]) -> Vec<u8> {
         assert!(init_iv.len() == 16);
         // XXX: a way to do this without creating an extra vec?
         let mut iv = [0u8; 16];
@@ -328,7 +336,7 @@ impl AESCipher {
         result
     }
 
-    fn cbc_decrypt(&self, ciphertext: &[u8], init_iv: &[u8]) -> Vec<u8> {
+    pub fn cbc_decrypt(&self, ciphertext: &[u8], init_iv: &[u8]) -> Vec<u8> {
         assert!(init_iv.len() == 16);
         // XXX: a way to do this without creating an extra vec?
         let mut iv = [0u8; 16];
