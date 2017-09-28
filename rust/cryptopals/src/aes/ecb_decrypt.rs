@@ -89,12 +89,17 @@ fn decrypt_aes_ecb_suffix(cipher: &AESCipher) -> Vec<u8> {
     result
 }
 
-pub fn decrypt_aes_ecb_simple_test() {
+fn rand_key() -> [u8; 16] {
     let mut rng = rand::thread_rng();
     let mut key = [0u8;16];
     for i in 0..16 {
         key[i] = rng.gen_range(0, 256 as usize) as u8;
     }
+    key
+}
+
+pub fn decrypt_aes_ecb_simple_test() {
+    let key = rand_key();
     println!("AES ECB simple decrypt test with key {:?}", &key);
 
     let cipher = AESCipher::new(&key);
