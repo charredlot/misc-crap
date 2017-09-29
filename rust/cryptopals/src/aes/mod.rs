@@ -4,7 +4,8 @@ mod constants;
 use self::constants::{SBOX,INV_SBOX,GF256_MUL_2, GF256_MUL_3, GF256_MUL_9,
                       GF256_MUL_11, GF256_MUL_13, GF256_MUL_14};
 use self::detect::distinguish_aes_cbc_ecb_test;
-use self::ecb_decrypt::decrypt_aes_ecb_simple_test;
+use self::ecb_decrypt::{decrypt_aes_ecb_simple_test,
+                        decrypt_aes_ecb_sandwich_test};
 use base64::base64_decode_file;
 use hex::{hex_to_bytes,bytes_to_hex};
 use pkcs::{pkcs7_pad,pkcs7_unpad};
@@ -557,5 +558,6 @@ pub fn aes_test() {
     distinguish_aes_cbc_ecb_test();
 
     decrypt_aes_ecb_simple_test();
+    decrypt_aes_ecb_sandwich_test();
     println!("Finished AES tests");
 }
