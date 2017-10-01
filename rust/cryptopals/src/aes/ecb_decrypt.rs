@@ -5,7 +5,6 @@ use std::str;
 
 use aes::AESCipher;
 use base64::base64_decode;
-use pkcs::pkcs7_pad;
 use self::rand::Rng;
 
 const ORACLE_SUFFIX: &'static str = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK";
@@ -24,21 +23,12 @@ fn get_encrypt_aes_ecb_suffix_oracle(key: &[u8]) -> Box<EncryptOracle> {
     })
 }
 
-fn encrypt_aes_ecb_sandwich_oracle(cipher: &AESCipher,
-                                   prefix: &[u8],
-                                   plaintext: &[u8]) -> Vec<u8> {
-    let mut sandwich = prefix.to_vec();
-    sandwich.extend_from_slice(plaintext);
-    sandwich.extend_from_slice(&base64_decode(ORACLE_SUFFIX));
-    cipher.ecb_encrypt(&pkcs7_pad(&sandwich, 16))
-}
-
 fn gen_encrypt_aes_ecb_sandwich_oracle(key: &[u8],
                                        prefix_len: usize) ->
                                             Box<EncryptOracle> {
     let mut rng = rand::thread_rng();
     let mut v: Vec<u8> = Vec::new();
-    for i in 0..prefix_len {
+    for _i in 0..prefix_len {
         v.push(rng.gen_range(0, 256 as usize) as u8);
     };
 
@@ -90,7 +80,7 @@ fn decrypt_aes_ecb_suffix(encrypt_oracle: &EncryptOracle,
     let mut result: Vec<u8> = Vec::new();
     let mut block_index: usize = 0;
 
-    for i in 0..pad_len + 16 {
+    for _i in 0..pad_len + 16 {
         block.push(0u8);
     }
 
@@ -155,8 +145,6 @@ pub fn decrypt_aes_ecb_simple_test() {
 }
 
 fn get_aes_ecb_prefix_len(encrypt_oracle: &EncryptOracle) -> usize {
-    let tot_len = encrypt_oracle(&[]).len();
-
     const EXPECT_BLOCKS: usize = 3;
     let splitter = [7u8; EXPECT_BLOCKS * 16];
     let mut probe = splitter.to_vec();
