@@ -1,0 +1,7 @@
+[package]
+name = "parse_test"
+version = "0.1.0"
+authors = ["charredlot <charredlot@gmail.com>"]
+
+[dependencies]
+libc = "0.2"
