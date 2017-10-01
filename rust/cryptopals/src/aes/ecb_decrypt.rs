@@ -5,7 +5,7 @@ use std::str;
 
 use aes::AESCipher;
 use base64::base64_decode;
-use self::rand::Rng;
+use util::{rand_key, rand_bytes};
 
 const ORACLE_SUFFIX: &'static str = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK";
 
@@ -26,11 +26,7 @@ fn get_encrypt_aes_ecb_suffix_oracle(key: &[u8]) -> Box<EncryptOracle> {
 fn gen_encrypt_aes_ecb_sandwich_oracle(key: &[u8],
                                        prefix_len: usize) ->
                                             Box<EncryptOracle> {
-    let mut rng = rand::thread_rng();
-    let mut v: Vec<u8> = Vec::new();
-    for _i in 0..prefix_len {
-        v.push(rng.gen_range(0, 256 as usize) as u8);
-    };
+    let v = rand_bytes(prefix_len);
 
     let cipher = AESCipher::new(key);
     Box::new(move |plaintext: &[u8]| -> Vec<u8> {
@@ -117,15 +113,6 @@ fn decrypt_aes_ecb_suffix(encrypt_oracle: &EncryptOracle,
     }
 
     result
-}
-
-fn rand_key() -> [u8; 16] {
-    let mut rng = rand::thread_rng();
-    let mut key = [0u8;16];
-    for i in 0..16 {
-        key[i] = rng.gen_range(0, 256 as usize) as u8;
-    }
-    key
 }
 
 pub fn decrypt_aes_ecb_simple_test() {

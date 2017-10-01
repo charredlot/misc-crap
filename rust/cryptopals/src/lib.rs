@@ -4,4 +4,5 @@ pub mod bytes;
 pub mod hex;
 pub mod pkcs;
 pub mod url;
+pub mod util;
 pub mod xor;
