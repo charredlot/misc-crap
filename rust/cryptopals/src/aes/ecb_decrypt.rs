@@ -12,13 +12,16 @@ const ORACLE_SUFFIX: &'static str = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9
 
 const ORACLE_SUFFIX_STR: &'static str = "Rollin' in my 5.0\nWith my rag-top down so my hair can blow\nThe girlies on standby waving just to say hi\nDid you stop? No, I just drove by\n";
 
-type EncryptOracle = Fn (&AESCipher, &[u8]) -> Vec<u8>;
+type EncryptOracle = Fn (&[u8]) -> Vec<u8>;
 
-fn encrypt_aes_ecb_suffix_oracle(cipher: &AESCipher,
-                                 plaintext: &[u8]) -> Vec<u8> {
-    let mut suffixed = plaintext.to_vec();
-    suffixed.extend_from_slice(&base64_decode(ORACLE_SUFFIX));
-    cipher.ecb_encrypt(&pkcs7_pad(&suffixed, 16))
+fn get_encrypt_aes_ecb_suffix_oracle(key: &[u8]) -> Box<EncryptOracle> {
+    let cipher = AESCipher::new(key);
+
+    Box::new(move |plaintext: &[u8]| -> Vec<u8> {
+        let mut suffixed = plaintext.to_vec();
+        suffixed.extend_from_slice(&base64_decode(ORACLE_SUFFIX));
+        cipher.ecb_pad_and_encrypt(&suffixed)
+    })
 }
 
 fn encrypt_aes_ecb_sandwich_oracle(cipher: &AESCipher,
@@ -30,37 +33,41 @@ fn encrypt_aes_ecb_sandwich_oracle(cipher: &AESCipher,
     cipher.ecb_encrypt(&pkcs7_pad(&sandwich, 16))
 }
 
-fn gen_encrypt_aes_ecb_sandwich_oracle(cipher: &AESCipher,
+fn gen_encrypt_aes_ecb_sandwich_oracle(key: &[u8],
                                        prefix_len: usize) ->
                                             Box<EncryptOracle> {
     let mut rng = rand::thread_rng();
     let mut v: Vec<u8> = Vec::new();
     for i in 0..prefix_len {
         v.push(rng.gen_range(0, 256 as usize) as u8);
-    }
-    Box::new(move |cipher: &AESCipher, plaintext: &[u8]| -> Vec<u8> {
-        encrypt_aes_ecb_sandwich_oracle(cipher, &v, plaintext)
+    };
+
+    let cipher = AESCipher::new(key);
+    Box::new(move |plaintext: &[u8]| -> Vec<u8> {
+        let mut sandwich = v.to_vec();
+        sandwich.extend_from_slice(plaintext);
+        sandwich.extend_from_slice(&base64_decode(ORACLE_SUFFIX));
+        cipher.ecb_pad_and_encrypt(&sandwich)
     })
 }
 
-fn confirm_aes_ecb(cipher: &AESCipher) {
+fn confirm_aes_ecb(encrypt_oracle: &EncryptOracle) {
     let two_blocks = [0u8; 32];
-    let ciphertext = encrypt_aes_ecb_suffix_oracle(cipher, &two_blocks);
+    let ciphertext = encrypt_oracle(&two_blocks);
     if ciphertext[0..16] != ciphertext[16..32] {
         panic!("expected aes ecb, got ciphertext {:?}", &ciphertext);
     }
 }
 
 // TODO: make encrypt_oracle take in a closure instead of cipher
-fn get_aes_ecb_hidden_len(cipher: &AESCipher,
-                          encrypt_oracle: &EncryptOracle) -> usize {
+fn get_aes_ecb_hidden_len(encrypt_oracle: &EncryptOracle) -> usize {
     let mut v: Vec<u8> = Vec::new();
 
     let mut result: usize = 0;
-    let start_len = encrypt_oracle(cipher, &v).len();
+    let start_len = encrypt_oracle(&v).len();
     for i in 1..17 {
         v.push(0u8);
-        let n = encrypt_oracle(cipher, &v).len();
+        let n = encrypt_oracle(&v).len();
         let diff = n - start_len;
         if diff > 0 {
             // if hidden_len % 16 == 0, adding 16 will give a 16 byte diff
@@ -74,8 +81,7 @@ fn get_aes_ecb_hidden_len(cipher: &AESCipher,
     result
 }
 
-fn decrypt_aes_ecb_suffix(cipher: &AESCipher,
-                          encrypt_oracle: &EncryptOracle,
+fn decrypt_aes_ecb_suffix(encrypt_oracle: &EncryptOracle,
                           pad_len: usize,
                           skip_len: usize,
                           suffix_len: usize) -> Vec<u8> {
@@ -94,13 +100,13 @@ fn decrypt_aes_ecb_suffix(cipher: &AESCipher,
             let byte = j as u8;
             block[pad_len + 15] = byte;
 
-            let ciphertext = encrypt_oracle(cipher, &block);
+            let ciphertext = encrypt_oracle(&block);
             // for some reason "j as u8" returns an Option
             block_map.insert((&ciphertext[skip_len..skip_len + 16]).to_vec(),
                              byte);
         }
         let end = pad_len + 15 - (i % 16);
-        let ciphertext = encrypt_oracle(cipher, &block[0..end]);
+        let ciphertext = encrypt_oracle(&block[0..end]);
 
         let cblock = skip_len + (block_index * 16);
         match block_map.get(&ciphertext[cblock..cblock + 16]) {
@@ -136,13 +142,11 @@ pub fn decrypt_aes_ecb_simple_test() {
     let key = rand_key();
     println!("AES ECB simple decrypt test with key {:?}", &key);
 
-    let cipher = AESCipher::new(&key);
-    confirm_aes_ecb(&cipher);
-    let suffix_len = get_aes_ecb_hidden_len(&cipher,
-                                            &encrypt_aes_ecb_suffix_oracle);
+    let encrypt_oracle = get_encrypt_aes_ecb_suffix_oracle(&key);
+    confirm_aes_ecb(&*encrypt_oracle);
+    let suffix_len = get_aes_ecb_hidden_len(&*encrypt_oracle);
     let decrypted_bytes = {
-        decrypt_aes_ecb_suffix(&cipher, &encrypt_aes_ecb_suffix_oracle,
-                               0, 0, suffix_len)
+        decrypt_aes_ecb_suffix(&*encrypt_oracle, 0, 0, suffix_len)
     };
     let decrypted = str::from_utf8(&decrypted_bytes).unwrap();
     if decrypted != ORACLE_SUFFIX_STR {
@@ -150,21 +154,20 @@ pub fn decrypt_aes_ecb_simple_test() {
     }
 }
 
-fn get_aes_ecb_prefix_len(cipher: &AESCipher,
-                          encrypt_oracle: &EncryptOracle) -> usize {
-    let tot_len = encrypt_oracle(cipher, &[]).len();
+fn get_aes_ecb_prefix_len(encrypt_oracle: &EncryptOracle) -> usize {
+    let tot_len = encrypt_oracle(&[]).len();
 
-    const expect_blocks: usize = 3;
-    let splitter = [7u8; expect_blocks * 16];
+    const EXPECT_BLOCKS: usize = 3;
+    let splitter = [7u8; EXPECT_BLOCKS * 16];
     let mut probe = splitter.to_vec();
     let mut prefix_len: Option<usize> = None;
 
-    // number of consecutive blocks == expect_blocks:
+    // number of consecutive blocks == EXPECT_BLOCKS:
     // if prefix_len % 16 == 0, 0 additional bytes
     // if prefix_len % 16 == 15, 1 additional bytes
     // if prefix_len % 16 == 14, 2 additional bytes
     'outer: for i in 0..16 {
-        let test = encrypt_oracle(cipher, &probe);
+        let test = encrypt_oracle(&probe);
         let mut consecutive = 1;
         let mut prev_block: Option<&[u8]> = None;
         for (j, block) in (&test).chunks(16).enumerate() {
@@ -172,11 +175,11 @@ fn get_aes_ecb_prefix_len(cipher: &AESCipher,
                 Some(prev) => {
                     if prev == block {
                         consecutive += 1;
-                        if consecutive == expect_blocks {
+                        if consecutive == EXPECT_BLOCKS {
                             // if matched 3 blocks on block 4,
                             // prefix plus extra bytes are in blocks
                             // 0 and 1. i is the extra bytes
-                            prefix_len = Some((j - expect_blocks + 1) * 16 -
+                            prefix_len = Some((j - EXPECT_BLOCKS + 1) * 16 -
                                               i);
                             break 'outer;
                         }
@@ -199,14 +202,12 @@ fn get_aes_ecb_prefix_len(cipher: &AESCipher,
     }
 }
 
-fn decrypt_aes_ecb_sandwich(cipher: &AESCipher,
-                            encrypt_oracle: &EncryptOracle) -> Vec<u8> {
-    let hidden_len = get_aes_ecb_hidden_len(cipher, encrypt_oracle);
-    let prefix_len = get_aes_ecb_prefix_len(cipher, encrypt_oracle);
+fn decrypt_aes_ecb_sandwich(encrypt_oracle: &EncryptOracle) -> Vec<u8> {
+    let hidden_len = get_aes_ecb_hidden_len(encrypt_oracle);
+    let prefix_len = get_aes_ecb_prefix_len(encrypt_oracle);
     let suffix_len = hidden_len - prefix_len;
     let rem = prefix_len % 16;
-    decrypt_aes_ecb_suffix(&cipher,
-                           encrypt_oracle,
+    decrypt_aes_ecb_suffix(encrypt_oracle,
                            if rem == 0 {
                                0
                            } else {
@@ -224,12 +225,9 @@ pub fn decrypt_aes_ecb_sandwich_test() {
     let key = rand_key();
     println!("AES ECB sandwich decrypt test with key {:?}", &key);
 
-    let cipher = AESCipher::new(&key);
-
     for i in 1..33 {
-        let encrypt_oracle = gen_encrypt_aes_ecb_sandwich_oracle(&cipher, i);
-        let decrypted_bytes = decrypt_aes_ecb_sandwich(&cipher,
-                                                       &*encrypt_oracle);
+        let encrypt_oracle = gen_encrypt_aes_ecb_sandwich_oracle(&key, i);
+        let decrypted_bytes = decrypt_aes_ecb_sandwich(&*encrypt_oracle);
         let decrypted = str::from_utf8(&decrypted_bytes).unwrap();
         if decrypted != ORACLE_SUFFIX_STR {
             panic!("decrypt aes ecb sandwich failed, got {:?}",
