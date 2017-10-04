@@ -13,7 +13,18 @@ pub fn pkcs7_pad(buf: &[u8], block_size: usize) -> Vec<u8> {
 }
 
 pub fn pkcs7_unpad<'a>(buf: &'a [u8]) -> &'a [u8] {
+    if buf.len() == 0 {
+        panic!("pkcs7_unpad len 0 buf");
+    }
     let pad = *buf.last().unwrap() as usize;
+    if pad > buf.len() {
+        panic!("pkcs7_unpad padding too long {:?}", buf);
+    }
+    for (i, &b) in (&buf[buf.len() - pad..]).iter().enumerate() {
+        if b != pad as u8 {
+            panic!("bad byte at {}: {:?}", buf.len() - pad + i, buf);
+        }
+    }
     &buf[0..(buf.len() - pad)]
 }
 
