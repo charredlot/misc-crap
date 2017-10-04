@@ -11,7 +11,7 @@ fn main() {
     base64_test();
     xor_test();
     hamming_distance_test();
-    aes_test();
     pkcs7_test();
     url_test();
+    aes_test();
 }
