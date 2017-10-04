@@ -1,8 +1,9 @@
 extern crate rand;
 
-use aes::AESCipher;
+use aes::{AESCipher, AES_BLOCK_SIZE};
 use pkcs::pkcs7_pad;
 use self::rand::Rng;
+use util::rand_key;
 
 fn random_bookend(buf: &[u8]) -> Vec<u8> {
     let mut rng = rand::thread_rng();
@@ -23,20 +24,21 @@ fn random_bookend(buf: &[u8]) -> Vec<u8> {
     }
 
     // XXX: version that takes vec?
-    pkcs7_pad(&result, 16)
+    pkcs7_pad(&result, AES_BLOCK_SIZE)
 }
 
 fn aes_cbc_ecb_random_encrypt(plaintext: &[u8]) -> (&'static str, Vec<u8>) {
-    let mut rng = rand::thread_rng();
-    let key = [rng.gen_range(0, 256) as u8; 16];
+    let key = rand_key();
     let padded = random_bookend(plaintext);
     let cipher = AESCipher::new(&key);
 
     // XXX: couldn't get closure boxing to work
+    let mut rng = rand::thread_rng();
     match rng.gen_range(0, 2) {
             0 => ("cbc",
                   {
-                      let iv: [u8; 16] = [rng.gen_range(0, 256) as u8; 16];
+                      let mut iv = vec![rng.gen_range(0, 256) as u8;
+                                        AES_BLOCK_SIZE];
                       cipher.cbc_encrypt(&padded, &iv)
                   }),
             1 => ("ecb", cipher.ecb_encrypt(&padded)),
@@ -45,7 +47,8 @@ fn aes_cbc_ecb_random_encrypt(plaintext: &[u8]) -> (&'static str, Vec<u8>) {
 }
 
 fn distinguish_oracle_aes_cbc_ecb(ciphertext: &[u8]) -> &'static str{
-    if ciphertext[16..32] == ciphertext [32..48] {
+    if ciphertext[AES_BLOCK_SIZE..(AES_BLOCK_SIZE * 2)] ==
+        ciphertext[(AES_BLOCK_SIZE * 2)..(AES_BLOCK_SIZE * 3)] {
         "ecb"
     } else {
         "cbc"

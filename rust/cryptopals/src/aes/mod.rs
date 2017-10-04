@@ -15,14 +15,16 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::str;
 
+const AES_BLOCK_SIZE: usize = 16;
+
 struct AESBlock {
-    values: [u8; 16],
+    values: [u8; AES_BLOCK_SIZE],
 }
 
 impl AESBlock {
     fn from_slice(values: &[u8]) -> AESBlock {
-        assert!(values.len() == 16);
-        let mut block = AESBlock {values: [0u8; 16]};
+        assert!(values.len() == AES_BLOCK_SIZE);
+        let mut block = AESBlock {values: [0u8; AES_BLOCK_SIZE]};
         for (i, &b) in values.iter().enumerate() {
             block.values[i] = b
         }
@@ -239,7 +241,7 @@ impl AESCipher {
         }
 
         let mut keys: Vec<Vec<u8>> = Vec::new();
-        for chunk in expanded.chunks(16) {
+        for chunk in expanded.chunks(AES_BLOCK_SIZE) {
             keys.push(chunk.to_vec());
         }
 
@@ -291,7 +293,7 @@ impl AESCipher {
     fn ecb_encrypt(&self, plaintext: &[u8]) -> Vec<u8> {
         let mut result: Vec<u8> = Vec::new();
 
-        for chunk in plaintext.chunks(16) {
+        for chunk in plaintext.chunks(AES_BLOCK_SIZE) {
             let mut block = self.encrypt_block(chunk);
             result.append(&mut block)
         }
@@ -300,13 +302,13 @@ impl AESCipher {
     }
 
     pub fn ecb_pad_and_encrypt(&self, plaintext: &[u8]) -> Vec<u8> {
-        self.ecb_encrypt(&pkcs7_pad(plaintext, 16))
+        self.ecb_encrypt(&pkcs7_pad(plaintext, AES_BLOCK_SIZE))
     }
 
     pub fn ecb_decrypt(&self, ciphertext: &[u8]) -> Vec<u8> {
         let mut result: Vec<u8> = Vec::new();
 
-        for chunk in ciphertext.chunks(16) {
+        for chunk in ciphertext.chunks(AES_BLOCK_SIZE) {
             let mut block = self.decrypt_block(chunk);
             result.append(&mut block)
         }
@@ -319,14 +321,14 @@ impl AESCipher {
     }
 
     pub fn cbc_encrypt(&self, plaintext: &[u8], init_iv: &[u8]) -> Vec<u8> {
-        assert!(init_iv.len() == 16);
+        assert!(init_iv.len() == AES_BLOCK_SIZE);
         // XXX: a way to do this without creating an extra vec?
-        let mut iv = [0u8; 16];
+        let mut iv = vec![0u8; AES_BLOCK_SIZE];
         for (dst, src) in iv.iter_mut().zip(init_iv) {
             *dst = *src;
         }
         let mut result: Vec<u8> = Vec::new();
-        for block in plaintext.chunks(16) {
+        for block in plaintext.chunks(AES_BLOCK_SIZE) {
             let mixed = fixed_xor(block, &iv);
             let encrypted = self.encrypt_block(&mixed);
             result.extend(encrypted.iter().cloned());
@@ -339,18 +341,18 @@ impl AESCipher {
 
     pub fn cbc_pad_and_encrypt(&self, plaintext: &[u8],
                                init_iv: &[u8]) -> Vec<u8> {
-        self.cbc_encrypt(&pkcs7_pad(plaintext, 16), init_iv)
+        self.cbc_encrypt(&pkcs7_pad(plaintext, AES_BLOCK_SIZE), init_iv)
     }
 
     pub fn cbc_decrypt(&self, ciphertext: &[u8], init_iv: &[u8]) -> Vec<u8> {
-        assert!(init_iv.len() == 16);
+        assert!(init_iv.len() == AES_BLOCK_SIZE);
         // XXX: a way to do this without creating an extra vec?
-        let mut iv = [0u8; 16];
+        let mut iv = vec![0; AES_BLOCK_SIZE];
         for (dst, src) in iv.iter_mut().zip(init_iv) {
             *dst = *src;
         }
         let mut result: Vec<u8> = Vec::new();
-        for block in ciphertext.chunks(16) {
+        for block in ciphertext.chunks(AES_BLOCK_SIZE) {
             result.append(&mut fixed_xor(&self.decrypt_block(block), &iv));
             for (dst, src) in iv.iter_mut().zip(block) {
                 *dst = *src;
@@ -415,7 +417,7 @@ fn rijndael_core(t: &mut [u8; 4], rcon_i: usize) {
 
 fn expand_key_test() {
     let tests = [
-        ([0u8; 16],
+        ([0u8; AES_BLOCK_SIZE],
          [
             0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8,
             0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8,
@@ -444,7 +446,8 @@ fn expand_key_test() {
 
     for &(key, expected) in &tests {
         let expanded = AESCipher::expand_key(&key);
-        for ((i, chunk), block) in expected.chunks(16).enumerate().zip(expanded) {
+        for ((i, chunk), block) in
+             expected.chunks(AES_BLOCK_SIZE).enumerate().zip(expanded) {
             if block != chunk {
                 panic!("expand_key_test expected {:?} got {:?} at chunk {}",
                        chunk, block, i);
@@ -482,7 +485,7 @@ fn detect_aes_ecb(buf: &[u8]) -> u64 {
     // XXX: length not multiple of block size
     let mut score: u64 = 0;
     let mut chunks: HashSet<&[u8]> = HashSet::new();
-    for chunk in buf.chunks(16) {
+    for chunk in buf.chunks(AES_BLOCK_SIZE) {
         if chunks.contains(chunk) {
             score += 1;
         } else {

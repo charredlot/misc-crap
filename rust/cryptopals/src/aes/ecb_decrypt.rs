@@ -3,7 +3,7 @@ extern crate rand;
 use std::collections::HashMap;
 use std::str;
 
-use aes::AESCipher;
+use aes::{AESCipher, AES_BLOCK_SIZE};
 use base64::base64_decode;
 use util::{rand_key, rand_bytes, EncryptOracle};
 
@@ -38,7 +38,8 @@ fn gen_encrypt_aes_ecb_sandwich_oracle(key: &[u8],
 fn confirm_aes_ecb(encrypt_oracle: &EncryptOracle) {
     let two_blocks = [0u8; 32];
     let ciphertext = encrypt_oracle(&two_blocks);
-    if ciphertext[0..16] != ciphertext[16..32] {
+    if ciphertext[..AES_BLOCK_SIZE] !=
+        ciphertext[AES_BLOCK_SIZE..(AES_BLOCK_SIZE * 2)] {
         panic!("expected aes ecb, got ciphertext {:?}", &ciphertext);
     }
 }
@@ -49,7 +50,7 @@ fn get_aes_ecb_hidden_len(encrypt_oracle: &EncryptOracle) -> usize {
 
     let mut result: usize = 0;
     let start_len = encrypt_oracle(&v).len();
-    for i in 1..17 {
+    for i in 1..(AES_BLOCK_SIZE + 1) {
         v.push(0u8);
         let n = encrypt_oracle(&v).len();
         let diff = n - start_len;
@@ -58,7 +59,7 @@ fn get_aes_ecb_hidden_len(encrypt_oracle: &EncryptOracle) -> usize {
             // if hidden_len % 16 == 15, adding 1 will give a 16 byte diff
             // if hidden_len % 16 == 14, adding 2 will give a 16 byte diff
             // etc.
-            result = n - 16 - i;
+            result = n - AES_BLOCK_SIZE - i;
             break;
         }
     }
@@ -74,7 +75,7 @@ fn decrypt_aes_ecb_suffix(encrypt_oracle: &EncryptOracle,
     let mut result: Vec<u8> = Vec::new();
     let mut block_index: usize = 0;
 
-    for _i in 0..pad_len + 16 {
+    for _ in 0..(pad_len + AES_BLOCK_SIZE) {
         block.push(0u8);
     }
 
@@ -86,25 +87,26 @@ fn decrypt_aes_ecb_suffix(encrypt_oracle: &EncryptOracle,
 
             let ciphertext = encrypt_oracle(&block);
             // for some reason "j as u8" returns an Option
-            block_map.insert((&ciphertext[skip_len..skip_len + 16]).to_vec(),
-                             byte);
+            let block_end = skip_len + AES_BLOCK_SIZE;
+            let block_key = (&ciphertext[skip_len..block_end]).to_vec();
+            block_map.insert(block_key, byte);
         }
-        let end = pad_len + 15 - (i % 16);
+        let end = pad_len + 15 - (i % AES_BLOCK_SIZE);
         let ciphertext = encrypt_oracle(&block[0..end]);
 
-        let cblock = skip_len + (block_index * 16);
-        match block_map.get(&ciphertext[cblock..cblock + 16]) {
+        let cblock = skip_len + (block_index * AES_BLOCK_SIZE);
+        match block_map.get(&ciphertext[cblock..(cblock + AES_BLOCK_SIZE)]) {
             Some(byte) => {
-                block[pad_len + 15] = *byte;
+                block[pad_len + AES_BLOCK_SIZE - 1] = *byte;
                 result.push(*byte);
             },
             None => panic!("block not found in map at byte {}", i),
         }
         // block is a sliding window, rotate left 1 every time
-        for j in pad_len..pad_len + 15 {
+        for j in pad_len..pad_len + AES_BLOCK_SIZE - 1 {
             block[j] = block[j + 1];
         }
-        if i % 16 == 15 {
+        if i % AES_BLOCK_SIZE == AES_BLOCK_SIZE - 1 {
             // figured out a block, go to the next ciphertext block
             block_index = block_index + 1;
         }
@@ -131,7 +133,7 @@ pub fn decrypt_aes_ecb_simple_test() {
 
 fn get_aes_ecb_prefix_len(encrypt_oracle: &EncryptOracle) -> usize {
     const EXPECT_BLOCKS: usize = 3;
-    let splitter = [7u8; EXPECT_BLOCKS * 16];
+    let splitter = [7u8; EXPECT_BLOCKS * AES_BLOCK_SIZE];
     let mut probe = splitter.to_vec();
     let mut prefix_len: Option<usize> = None;
 
@@ -139,11 +141,11 @@ fn get_aes_ecb_prefix_len(encrypt_oracle: &EncryptOracle) -> usize {
     // if prefix_len % 16 == 0, 0 additional bytes
     // if prefix_len % 16 == 15, 1 additional bytes
     // if prefix_len % 16 == 14, 2 additional bytes
-    'outer: for i in 0..16 {
+    'outer: for i in 0..AES_BLOCK_SIZE {
         let test = encrypt_oracle(&probe);
         let mut consecutive = 1;
         let mut prev_block: Option<&[u8]> = None;
-        for (j, block) in (&test).chunks(16).enumerate() {
+        for (j, block) in (&test).chunks(AES_BLOCK_SIZE).enumerate() {
             match prev_block {
                 Some(prev) => {
                     if prev == block {
@@ -152,8 +154,9 @@ fn get_aes_ecb_prefix_len(encrypt_oracle: &EncryptOracle) -> usize {
                             // if matched 3 blocks on block 4,
                             // prefix plus extra bytes are in blocks
                             // 0 and 1. i is the extra bytes
-                            prefix_len = Some((j - EXPECT_BLOCKS + 1) * 16 -
-                                              i);
+                            let block_index = j - EXPECT_BLOCKS + 1;
+                            let block_end = block_index * AES_BLOCK_SIZE;
+                            prefix_len = Some(block_end - i);
                             break 'outer;
                         }
                     } else {
@@ -179,17 +182,17 @@ fn decrypt_aes_ecb_sandwich(encrypt_oracle: &EncryptOracle) -> Vec<u8> {
     let hidden_len = get_aes_ecb_hidden_len(encrypt_oracle);
     let prefix_len = get_aes_ecb_prefix_len(encrypt_oracle);
     let suffix_len = hidden_len - prefix_len;
-    let rem = prefix_len % 16;
+    let rem = prefix_len % AES_BLOCK_SIZE;
     decrypt_aes_ecb_suffix(encrypt_oracle,
                            if rem == 0 {
                                0
                            } else {
-                               16 - rem
+                               AES_BLOCK_SIZE - rem
                            },
                            if rem == 0 {
                                prefix_len
                            } else {
-                               prefix_len + 16 - rem
+                               prefix_len + AES_BLOCK_SIZE - rem
                            },
                            suffix_len)
 }
