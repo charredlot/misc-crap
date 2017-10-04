@@ -337,6 +337,11 @@ impl AESCipher {
         result
     }
 
+    pub fn cbc_pad_and_encrypt(&self, plaintext: &[u8],
+                               init_iv: &[u8]) -> Vec<u8> {
+        self.cbc_encrypt(&pkcs7_pad(plaintext, 16), init_iv)
+    }
+
     pub fn cbc_decrypt(&self, ciphertext: &[u8], init_iv: &[u8]) -> Vec<u8> {
         assert!(init_iv.len() == 16);
         // XXX: a way to do this without creating an extra vec?
@@ -352,6 +357,11 @@ impl AESCipher {
             }
         }
         result
+    }
+
+    pub fn cbc_decrypt_and_unpad(&self, ciphertext: &[u8],
+                                 init_iv: &[u8]) -> Vec<u8> {
+        pkcs7_unpad(&self.cbc_decrypt(ciphertext, init_iv)).to_vec()
     }
 }
 
