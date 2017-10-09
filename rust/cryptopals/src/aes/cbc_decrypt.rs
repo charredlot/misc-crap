@@ -19,14 +19,14 @@ fn get_encrypt_aes_cbc_ssv_oracle(key: &[u8]) -> Box<EncryptOracle> {
         // too lazy
         result.extend_from_slice(plaintext);
         result.extend_from_slice(SSV_SUFFIX.as_bytes());
-        cipher.cbc_pad_and_encrypt(&result, &SSV_IV)
+        cipher.cbc_pad_and_encrypt(&SSV_IV, &result)
     })
 }
 
 fn get_decrypt_aes_cbc_ssv(key: &[u8]) -> Box<DecryptOracle> {
     let cipher = AESCipher::new(key);
     Box::new(move |ciphertext: &[u8]| -> Vec<u8> {
-        cipher.cbc_decrypt_and_unpad(ciphertext, &SSV_IV)
+        cipher.cbc_decrypt_and_unpad(&SSV_IV, ciphertext)
     })
 }
 

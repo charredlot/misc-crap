@@ -322,7 +322,7 @@ impl AESCipher {
         pkcs7_unpad(&self.ecb_decrypt(ciphertext), AES_BLOCK_SIZE).to_vec()
     }
 
-    pub fn cbc_encrypt(&self, plaintext: &[u8], init_iv: &[u8]) -> Vec<u8> {
+    pub fn cbc_encrypt(&self, init_iv: &[u8], plaintext: &[u8]) -> Vec<u8> {
         assert!(init_iv.len() == AES_BLOCK_SIZE);
         // XXX: a way to do this without creating an extra vec?
         let mut iv = vec![0u8; AES_BLOCK_SIZE];
@@ -341,12 +341,13 @@ impl AESCipher {
         result
     }
 
-    pub fn cbc_pad_and_encrypt(&self, plaintext: &[u8],
-                               init_iv: &[u8]) -> Vec<u8> {
-        self.cbc_encrypt(&pkcs7_pad(plaintext, AES_BLOCK_SIZE), init_iv)
+    pub fn cbc_pad_and_encrypt(&self,
+                               init_iv: &[u8],
+                               plaintext: &[u8]) -> Vec<u8> {
+        self.cbc_encrypt(init_iv, &pkcs7_pad(plaintext, AES_BLOCK_SIZE))
     }
 
-    pub fn cbc_decrypt(&self, ciphertext: &[u8], init_iv: &[u8]) -> Vec<u8> {
+    pub fn cbc_decrypt(&self, init_iv: &[u8], ciphertext: &[u8]) -> Vec<u8> {
         assert!(init_iv.len() == AES_BLOCK_SIZE);
         // XXX: a way to do this without creating an extra vec?
         let mut iv = vec![0; AES_BLOCK_SIZE];
@@ -363,9 +364,10 @@ impl AESCipher {
         result
     }
 
-    pub fn cbc_decrypt_and_unpad(&self, ciphertext: &[u8],
-                                 init_iv: &[u8]) -> Vec<u8> {
-        pkcs7_unpad(&self.cbc_decrypt(ciphertext, init_iv),
+    pub fn cbc_decrypt_and_unpad(&self,
+                                 init_iv: &[u8],
+                                 ciphertext: &[u8]) -> Vec<u8> {
+        pkcs7_unpad(&self.cbc_decrypt(init_iv, ciphertext),
                     AES_BLOCK_SIZE).to_vec()
     }
 }
@@ -527,7 +529,7 @@ fn detect_aes_ecb_in_file(filename: &str) {
 fn decrypt_aes_cbc_base64_file(filename: &str, key: &[u8], iv: &[u8]) {
     let f = base64_decode_file(filename);
     let cipher = AESCipher::new(key);
-    let decrypted_bytes = cipher.cbc_decrypt(&f, iv);
+    let decrypted_bytes = cipher.cbc_decrypt(iv, &f);
     let decrypted = str::from_utf8(&pkcs7_unpad(&decrypted_bytes,
                                                 AES_BLOCK_SIZE)).unwrap();
     println!("AES CBC decrypt {}:\n{}", filename, decrypted);
