@@ -20,6 +20,18 @@ pub fn pkcs7_unpad<'a>(buf: &'a [u8], block_size: usize) -> &'a [u8] {
     }
 }
 
+pub fn pkcs7_unpad_copy(buf: &[u8], block_size: usize) -> Vec<u8> {
+    pkcs7_unpad(buf, block_size).to_vec()
+}
+
+pub fn pkcs7_maybe_unpad_copy(buf: &[u8],
+                              block_size: usize) -> Result<Vec<u8>, String> {
+    match pkcs7_maybe_unpad(buf, block_size) {
+        Ok(result) => Ok(result.to_vec()),
+        Err(e) => Err(e),
+    }
+}
+
 pub fn pkcs7_maybe_unpad<'a>(buf: &'a [u8],
                              block_size: usize) -> Result<&'a [u8], String> {
     if buf.len() == 0 {
