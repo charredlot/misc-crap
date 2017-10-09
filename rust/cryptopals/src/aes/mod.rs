@@ -10,7 +10,7 @@ use self::ecb_decrypt::{decrypt_aes_ecb_simple_test,
                         decrypt_aes_ecb_sandwich_test};
 use base64::base64_decode_file;
 use hex::{hex_to_bytes,bytes_to_hex};
-use pkcs::{pkcs7_pad,pkcs7_unpad};
+use pkcs7::{pkcs7_pad,pkcs7_unpad};
 use xor::fixed_xor;
 use std::collections::HashSet;
 use std::fs::File;

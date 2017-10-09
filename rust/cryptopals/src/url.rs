@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::str;
 
 use aes::AESCipher;
-use pkcs::pkcs7_pad;
+use pkcs7::pkcs7_pad;
 
 pub fn url_decode(params: &str) -> HashMap<String, String> {
     let mut map: HashMap<String, String> = HashMap::new();

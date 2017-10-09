@@ -1,7 +1,7 @@
 extern crate rand;
 
 use aes::{AESCipher, AES_BLOCK_SIZE};
-use pkcs::pkcs7_pad;
+use pkcs7::pkcs7_pad;
 use self::rand::Rng;
 use util::rand_key;
 
