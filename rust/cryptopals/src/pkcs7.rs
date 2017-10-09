@@ -13,24 +13,29 @@ pub fn pkcs7_pad(buf: &[u8], block_size: usize) -> Vec<u8> {
     out
 }
 
-pub fn pkcs7_unpad<'a>(buf: &'a [u8]) -> &'a [u8] {
-    match pkcs7_maybe_unpad(buf) {
+pub fn pkcs7_unpad<'a>(buf: &'a [u8], block_size: usize) -> &'a [u8] {
+    match pkcs7_maybe_unpad(buf, block_size) {
         Ok(result) => result,
         Err(e) => panic!(e),
     }
 }
 
-pub fn pkcs7_maybe_unpad<'a>(buf: &'a [u8]) -> Result<&'a [u8], String> {
+pub fn pkcs7_maybe_unpad<'a>(buf: &'a [u8],
+                             block_size: usize) -> Result<&'a [u8], String> {
     if buf.len() == 0 {
         return Err(String::from("pkcs7_unpad len 0 buf"));
     }
     let pad = *buf.last().unwrap() as usize;
-    if pad > buf.len() {
-        return Err(format!("pkcs7_unpad padding too long {:?}", buf));
-    }
     if pad == 0 {
         return Err(format!("pkcs7_unpad 0 is not valid padding {:?}", buf));
+    } else if pad > block_size {
+        return Err(
+            format!("pkcs7_unpad padding longer than block_size {} {:?}",
+                    block_size, buf));
+    } else if pad > buf.len() {
+        return Err(format!("pkcs7_unpad padding longer than buf {:?}", buf));
     }
+
     for (i, &b) in (&buf[buf.len() - pad..]).iter().enumerate() {
         if b != pad as u8 {
             return Err(format!("bad byte at {}: {:?}",

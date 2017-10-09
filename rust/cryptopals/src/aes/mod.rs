@@ -319,7 +319,7 @@ impl AESCipher {
     }
 
     pub fn ecb_decrypt_and_unpad(&self, ciphertext: &[u8]) -> Vec<u8> {
-        pkcs7_unpad(&self.ecb_decrypt(ciphertext)).to_vec()
+        pkcs7_unpad(&self.ecb_decrypt(ciphertext), AES_BLOCK_SIZE).to_vec()
     }
 
     pub fn cbc_encrypt(&self, plaintext: &[u8], init_iv: &[u8]) -> Vec<u8> {
@@ -365,7 +365,8 @@ impl AESCipher {
 
     pub fn cbc_decrypt_and_unpad(&self, ciphertext: &[u8],
                                  init_iv: &[u8]) -> Vec<u8> {
-        pkcs7_unpad(&self.cbc_decrypt(ciphertext, init_iv)).to_vec()
+        pkcs7_unpad(&self.cbc_decrypt(ciphertext, init_iv),
+                    AES_BLOCK_SIZE).to_vec()
     }
 }
 
@@ -527,7 +528,8 @@ fn decrypt_aes_cbc_base64_file(filename: &str, key: &[u8], iv: &[u8]) {
     let f = base64_decode_file(filename);
     let cipher = AESCipher::new(key);
     let decrypted_bytes = cipher.cbc_decrypt(&f, iv);
-    let decrypted = str::from_utf8(&pkcs7_unpad(&decrypted_bytes)).unwrap();
+    let decrypted = str::from_utf8(&pkcs7_unpad(&decrypted_bytes,
+                                                AES_BLOCK_SIZE)).unwrap();
     println!("AES CBC decrypt {}:\n{}", filename, decrypted);
 }
 
@@ -562,7 +564,8 @@ pub fn aes_test() {
     let f = base64_decode_file("data/1.7.txt");
     let cipher = AESCipher::new("YELLOW SUBMARINE".as_bytes());
     let decrypted_bytes = cipher.ecb_decrypt(&f);
-    let decrypted = str::from_utf8(pkcs7_unpad(&decrypted_bytes)).unwrap();
+    let decrypted = str::from_utf8(pkcs7_unpad(&decrypted_bytes,
+                                               AES_BLOCK_SIZE)).unwrap();
     println!("AES ECB decrypt 1.7.txt:\n{}----", decrypted);
 
     detect_aes_ecb_in_file("data/1.8.txt");
