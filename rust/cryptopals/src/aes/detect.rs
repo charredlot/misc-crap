@@ -37,8 +37,8 @@ fn aes_cbc_ecb_random_encrypt(plaintext: &[u8]) -> (&'static str, Vec<u8>) {
     match rng.gen_range(0, 2) {
             0 => ("cbc",
                   {
-                      let mut iv = vec![rng.gen_range(0, 256) as u8;
-                                        AES_BLOCK_SIZE];
+                      let iv = vec![rng.gen_range(0, 256) as u8;
+                                    AES_BLOCK_SIZE];
                       cipher.cbc_encrypt(&padded, &iv)
                   }),
             1 => ("ecb", cipher.ecb_encrypt(&padded)),
