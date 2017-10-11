@@ -3,7 +3,7 @@ extern crate rand;
 use std::str;
 
 use aes::{AESCipherOld, AES_BLOCK_SIZE};
-use pkcs7::{pkcs7_pad, pkcs7_unpad, pkcs7_maybe_unpad_copy};
+use pkcs7::{pkcs7_pad, pkcs7_maybe_unpad_copy};
 use util::{rand_key, rand_bytes, EncryptOracle, DecryptOracle};
 
 // XXX: should be okay to be constant for this?
@@ -235,7 +235,7 @@ fn decrypt_aes_cbc_padding_test(plaintext: &[u8]) {
     let cipher = AESCipherOld::new(&key);
     let iv = rand_bytes(AES_BLOCK_SIZE);
 
-    let mut ciphertext = cipher.cbc_pad_and_encrypt(&iv, plaintext);
+    let ciphertext = cipher.cbc_pad_and_encrypt(&iv, plaintext);
 
     println!("aes cbc padding oracle decrypt {:?}", plaintext);
     println!("key: {:?}", &key);
