@@ -9,6 +9,7 @@ use self::cbc_decrypt::decrypt_aes_cbc_test;
 use self::constants::{SBOX,INV_SBOX,GF256_MUL_2, GF256_MUL_3, GF256_MUL_9,
                       GF256_MUL_11, GF256_MUL_13, GF256_MUL_14};
 use self::detect::distinguish_aes_cbc_ecb_test;
+use self::ecb::AESCipherECB;
 use self::ecb_decrypt::{decrypt_aes_ecb_simple_test,
                         decrypt_aes_ecb_sandwich_test};
 use base64::base64_decode_file;
@@ -296,49 +297,6 @@ pub fn expand_key(key: &[u8]) -> Vec<Vec<u8>> {
     keys
 }
 
-pub struct AESCipherOld {
-    key_schedule: Vec<Vec<u8>>
-}
-
-impl AESCipherOld {
-    pub fn new(key: &[u8]) -> AESCipherOld {
-        // XXX: could pack encrypt/decrypt in a closure like go does?
-        AESCipherOld {
-            key_schedule: expand_key(key),
-        }
-    }
-
-    fn ecb_encrypt(&self, plaintext: &[u8]) -> Vec<u8> {
-        let mut result: Vec<u8> = Vec::new();
-
-        for chunk in plaintext.chunks(AES_BLOCK_SIZE) {
-            let mut block: Vec<u8> = encrypt_block(&self.key_schedule, chunk);
-            result.append(&mut block)
-        }
-
-        result
-    }
-
-    pub fn ecb_pad_and_encrypt(&self, plaintext: &[u8]) -> Vec<u8> {
-        self.ecb_encrypt(&pkcs7_pad(plaintext, AES_BLOCK_SIZE))
-    }
-
-    pub fn ecb_decrypt(&self, ciphertext: &[u8]) -> Vec<u8> {
-        let mut result: Vec<u8> = Vec::new();
-
-        for chunk in ciphertext.chunks(AES_BLOCK_SIZE) {
-            let mut block = decrypt_block(&self.key_schedule, chunk);
-            result.append(&mut block)
-        }
-
-        result
-    }
-
-    pub fn ecb_decrypt_and_unpad(&self, ciphertext: &[u8]) -> Vec<u8> {
-        pkcs7_unpad(&self.ecb_decrypt(ciphertext), AES_BLOCK_SIZE).to_vec()
-    }
-}
-
 fn rijndael_core(t: &mut [u8; 4], rcon_i: usize) {
     const RCON: [u8; 256] = [
         0x8du8, 0x01u8, 0x02u8, 0x04u8, 0x08u8, 0x10u8, 0x20u8, 0x40u8,
@@ -532,10 +490,9 @@ pub fn aes_test() {
     }
 
     let f = base64_decode_file("data/1.7.txt");
-    let cipher = AESCipherOld::new("YELLOW SUBMARINE".as_bytes());
-    let decrypted_bytes = cipher.ecb_decrypt(&f);
-    let decrypted = str::from_utf8(pkcs7_unpad(&decrypted_bytes,
-                                               AES_BLOCK_SIZE)).unwrap();
+    let cipher = AESCipherECB::new("YELLOW SUBMARINE".as_bytes());
+    let decrypted_bytes = cipher.decrypt_and_unpad(&f);
+    let decrypted = str::from_utf8(&decrypted_bytes).unwrap();
     println!("AES ECB decrypt 1.7.txt:\n{}----", decrypted);
 
     detect_aes_ecb_in_file("data/1.8.txt");
