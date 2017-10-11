@@ -1,7 +1,8 @@
+pub mod cbc;
 mod cbc_decrypt;
+mod constants;
 mod detect;
 mod ecb_decrypt;
-mod constants;
 use self::cbc_decrypt::decrypt_aes_cbc_test;
 use self::constants::{SBOX,INV_SBOX,GF256_MUL_2, GF256_MUL_3, GF256_MUL_9,
                       GF256_MUL_11, GF256_MUL_13, GF256_MUL_14};

@@ -2,7 +2,8 @@ extern crate rand;
 
 use std::str;
 
-use aes::{AESCipherOld, AES_BLOCK_SIZE};
+use aes::{AESCipher, AES_BLOCK_SIZE};
+use aes::cbc::AESCipherCBC;
 use pkcs7::{pkcs7_pad, pkcs7_maybe_unpad_copy};
 use util::{rand_key, rand_bytes, EncryptOracle, DecryptOracle};
 
@@ -15,21 +16,21 @@ const ADMIN_STR: &'static str = ";admin=true;";
 
 // ssv: semicolon-separated values
 fn get_encrypt_aes_cbc_ssv_oracle(key: &[u8]) -> Box<EncryptOracle> {
-    let cipher = AESCipherOld::new(key);
+    let cipher = AESCipherCBC::new(key, &SSV_IV);
     Box::new(move |plaintext: &[u8]| -> Vec<u8> {
         let mut result = SSV_PREFIX.as_bytes().to_vec();
         // XXX: should strip/escape semicolons and equal signs but
         // too lazy
         result.extend_from_slice(plaintext);
         result.extend_from_slice(SSV_SUFFIX.as_bytes());
-        cipher.cbc_pad_and_encrypt(&SSV_IV, &result)
+        cipher.pad_and_encrypt(&result)
     })
 }
 
 fn get_decrypt_aes_cbc_ssv(key: &[u8]) -> Box<DecryptOracle> {
-    let cipher = AESCipherOld::new(key);
+    let cipher = AESCipherCBC::new(key, &SSV_IV);
     Box::new(move |ciphertext: &[u8]| -> Vec<u8> {
-        cipher.cbc_decrypt_and_unpad(&SSV_IV, ciphertext)
+        cipher.decrypt_and_unpad(ciphertext)
     })
 }
 
@@ -103,18 +104,18 @@ fn decrypt_aes_cbc_ssv_bitflip_test() {
     println!("Finished AES CBC bitflip test");
 }
 
-fn aes_cbc_decrypt_padding_oracle(cipher: &AESCipherOld,
+fn aes_cbc_decrypt_padding_oracle(cipher: &AESCipherCBC,
                                   iv: &[u8],
                                   ciphertext: &[u8]) ->
                                     Result<Vec<u8>, String> {
-    let padded = cipher.cbc_decrypt(iv, ciphertext);
+    let padded = cipher.decrypt_iv(iv, ciphertext);
     match pkcs7_maybe_unpad_copy(&padded, AES_BLOCK_SIZE) {
         Ok(_) => Ok(padded),
         Err(e) => Err(e),
     }
 }
 
-fn disambiguate_padding(cipher: &AESCipherOld,
+fn disambiguate_padding(cipher: &AESCipherCBC,
                         prev_block: &[u8],
                         block: &[u8],
                         i: usize) -> bool {
@@ -140,7 +141,7 @@ fn disambiguate_padding(cipher: &AESCipherOld,
     false_positive
 }
 
-fn aes_cbc_padding_oracle_guess_block(cipher: &AESCipherOld,
+fn aes_cbc_padding_oracle_guess_block(cipher: &AESCipherCBC,
                                       prev_block: &[u8],
                                       block: &[u8]) -> Vec<u8> {
     // assume we have ciphertext blocks c1, c2 and plaintext p1, p2
@@ -230,12 +231,11 @@ fn aes_cbc_padding_oracle_guess_block(cipher: &AESCipherOld,
 }
 
 fn decrypt_aes_cbc_padding_test(plaintext: &[u8]) {
-    // TODO: redo AESCipherOld as a trait :/
     let key = rand_key();
-    let cipher = AESCipherOld::new(&key);
     let iv = rand_bytes(AES_BLOCK_SIZE);
+    let cipher = AESCipherCBC::new(&key, &iv);
 
-    let ciphertext = cipher.cbc_pad_and_encrypt(&iv, plaintext);
+    let ciphertext = cipher.pad_and_encrypt(plaintext);
 
     println!("aes cbc padding oracle decrypt {:?}", plaintext);
     println!("key: {:?}", &key);
