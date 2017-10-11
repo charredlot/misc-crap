@@ -1,6 +1,7 @@
 extern crate rand;
 
-use aes::{AESCipherOld, AES_BLOCK_SIZE};
+use aes::{AESCipher, AESCipherOld, AES_BLOCK_SIZE};
+use aes::cbc::AESCipherCBC;
 use pkcs7::pkcs7_pad;
 use self::rand::Rng;
 use util::rand_key;
@@ -30,7 +31,6 @@ fn random_bookend(buf: &[u8]) -> Vec<u8> {
 fn aes_cbc_ecb_random_encrypt(plaintext: &[u8]) -> (&'static str, Vec<u8>) {
     let key = rand_key();
     let padded = random_bookend(plaintext);
-    let cipher = AESCipherOld::new(&key);
 
     // XXX: couldn't get closure boxing to work
     let mut rng = rand::thread_rng();
@@ -39,9 +39,13 @@ fn aes_cbc_ecb_random_encrypt(plaintext: &[u8]) -> (&'static str, Vec<u8>) {
                   {
                       let iv = vec![rng.gen_range(0, 256) as u8;
                                     AES_BLOCK_SIZE];
-                      cipher.cbc_encrypt(&iv, &padded)
+                      let cipher = AESCipherCBC::new(&key, &iv);
+                      cipher.encrypt(&padded)
                   }),
-            1 => ("ecb", cipher.ecb_encrypt(&padded)),
+            1 => ("ecb", {
+                let cipher = AESCipherOld::new(&key);
+                cipher.ecb_encrypt(&padded)
+            }),
             _ => panic!("welp"),  // should be unreachable
     }
 }

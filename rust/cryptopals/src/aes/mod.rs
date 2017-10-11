@@ -3,6 +3,7 @@ mod cbc_decrypt;
 mod constants;
 mod detect;
 mod ecb_decrypt;
+use self::cbc::AESCipherCBC;
 use self::cbc_decrypt::decrypt_aes_cbc_test;
 use self::constants::{SBOX,INV_SBOX,GF256_MUL_2, GF256_MUL_3, GF256_MUL_9,
                       GF256_MUL_11, GF256_MUL_13, GF256_MUL_14};
@@ -12,7 +13,6 @@ use self::ecb_decrypt::{decrypt_aes_ecb_simple_test,
 use base64::base64_decode_file;
 use hex::{hex_to_bytes,bytes_to_hex};
 use pkcs7::{pkcs7_pad, pkcs7_unpad, pkcs7_unpad_copy};
-use xor::fixed_xor;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -336,56 +336,6 @@ impl AESCipherOld {
     pub fn ecb_decrypt_and_unpad(&self, ciphertext: &[u8]) -> Vec<u8> {
         pkcs7_unpad(&self.ecb_decrypt(ciphertext), AES_BLOCK_SIZE).to_vec()
     }
-
-    pub fn cbc_encrypt(&self, init_iv: &[u8], plaintext: &[u8]) -> Vec<u8> {
-        assert!(init_iv.len() == AES_BLOCK_SIZE);
-        // XXX: a way to do this without creating an extra vec?
-        let mut iv = vec![0u8; AES_BLOCK_SIZE];
-        for (dst, src) in iv.iter_mut().zip(init_iv) {
-            *dst = *src;
-        }
-        let mut result: Vec<u8> = Vec::new();
-        for block in plaintext.chunks(AES_BLOCK_SIZE) {
-            let mixed = fixed_xor(block, &iv);
-            let encrypted = encrypt_block(&self.key_schedule, &mixed);
-            result.extend(encrypted.iter().cloned());
-            for (dst, src) in iv.iter_mut().zip(&encrypted) {
-                *dst = *src;
-            }
-        }
-        result
-    }
-
-    pub fn cbc_pad_and_encrypt(&self,
-                               init_iv: &[u8],
-                               plaintext: &[u8]) -> Vec<u8> {
-        self.cbc_encrypt(init_iv, &pkcs7_pad(plaintext, AES_BLOCK_SIZE))
-    }
-
-    pub fn cbc_decrypt(&self, init_iv: &[u8], ciphertext: &[u8]) -> Vec<u8> {
-        assert!(init_iv.len() == AES_BLOCK_SIZE);
-        // XXX: a way to do this without creating an extra vec?
-        let mut iv = vec![0; AES_BLOCK_SIZE];
-        for (dst, src) in iv.iter_mut().zip(init_iv) {
-            *dst = *src;
-        }
-        let mut result: Vec<u8> = Vec::new();
-        for block in ciphertext.chunks(AES_BLOCK_SIZE) {
-            let decrypted_block = decrypt_block(&self.key_schedule, block);
-            result.append(&mut fixed_xor(&decrypted_block, &iv));
-            for (dst, src) in iv.iter_mut().zip(block) {
-                *dst = *src;
-            }
-        }
-        result
-    }
-
-    pub fn cbc_decrypt_and_unpad(&self,
-                                 init_iv: &[u8],
-                                 ciphertext: &[u8]) -> Vec<u8> {
-        pkcs7_unpad(&self.cbc_decrypt(init_iv, ciphertext),
-                    AES_BLOCK_SIZE).to_vec()
-    }
 }
 
 fn rijndael_core(t: &mut [u8; 4], rcon_i: usize) {
@@ -544,8 +494,8 @@ fn detect_aes_ecb_in_file(filename: &str) {
 
 fn decrypt_aes_cbc_base64_file(filename: &str, key: &[u8], iv: &[u8]) {
     let f = base64_decode_file(filename);
-    let cipher = AESCipherOld::new(key);
-    let decrypted_bytes = cipher.cbc_decrypt(iv, &f);
+    let cipher = AESCipherCBC::new(key, iv);
+    let decrypted_bytes = cipher.decrypt(&f);
     let decrypted = str::from_utf8(&pkcs7_unpad(&decrypted_bytes,
                                                 AES_BLOCK_SIZE)).unwrap();
     println!("AES CBC decrypt {}:\n{}", filename, decrypted);
