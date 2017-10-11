@@ -10,7 +10,7 @@ use self::ecb_decrypt::{decrypt_aes_ecb_simple_test,
                         decrypt_aes_ecb_sandwich_test};
 use base64::base64_decode_file;
 use hex::{hex_to_bytes,bytes_to_hex};
-use pkcs7::{pkcs7_pad,pkcs7_unpad};
+use pkcs7::{pkcs7_pad, pkcs7_unpad, pkcs7_unpad_copy};
 use xor::fixed_xor;
 use std::collections::HashSet;
 use std::fs::File;
@@ -18,6 +18,23 @@ use std::io::{BufRead, BufReader};
 use std::str;
 
 const AES_BLOCK_SIZE: usize = 16;
+
+pub trait AESCipher {
+    fn set_iv(&mut self, _iv: &[u8]) { panic!("set_iv not implemented "); }
+
+    fn encrypt(&self, plaintext: &[u8]) -> Vec<u8>;
+    fn decrypt(&self, ciphertext: &[u8]) -> Vec<u8>;
+
+    fn pad_and_encrypt(&self, plaintext: &[u8]) -> Vec<u8> {
+        let padded = pkcs7_pad(plaintext, AES_BLOCK_SIZE);
+        self.encrypt(&padded)
+    }
+
+    fn decrypt_and_unpad(&self, ciphertext: &[u8]) -> Vec<u8> {
+        let decrypted = self.decrypt(ciphertext);
+        pkcs7_unpad_copy(&decrypted, AES_BLOCK_SIZE)
+    }
+}
 
 pub fn encrypt_block(key_schedule: &Vec<Vec<u8>>,
                      plaintext: &[u8]) -> Vec<u8> {
