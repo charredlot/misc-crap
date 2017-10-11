@@ -13,6 +13,12 @@ pub fn fixed_xor(buf: &[u8], key: &[u8]) -> Vec<u8> {
     vec
 }
 
+pub fn slice_xor_inplace(dst: &mut [u8], src: &[u8]) {
+    for (d, s) in dst.iter_mut().zip(src) {
+        *d = *d ^ *s;
+    }
+}
+
 const ENGLISH_BYTE_SCALE: u64 = 10000;
 const ENGLISH_BYTE_FREQS: [u64; 256] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
