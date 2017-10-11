@@ -1,7 +1,8 @@
 extern crate rand;
 
-use aes::{AESCipher, AESCipherOld, AES_BLOCK_SIZE};
+use aes::{AESCipher, AES_BLOCK_SIZE};
 use aes::cbc::AESCipherCBC;
+use aes::ecb::AESCipherECB;
 use pkcs7::pkcs7_pad;
 use self::rand::Rng;
 use util::rand_key;
@@ -43,8 +44,8 @@ fn aes_cbc_ecb_random_encrypt(plaintext: &[u8]) -> (&'static str, Vec<u8>) {
                       cipher.encrypt(&padded)
                   }),
             1 => ("ecb", {
-                let cipher = AESCipherOld::new(&key);
-                cipher.ecb_encrypt(&padded)
+                let cipher = AESCipherECB::new(&key);
+                cipher.encrypt(&padded)
             }),
             _ => panic!("welp"),  // should be unreachable
     }

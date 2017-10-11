@@ -2,6 +2,7 @@ pub mod cbc;
 mod cbc_decrypt;
 mod constants;
 mod detect;
+pub mod ecb;
 mod ecb_decrypt;
 use self::cbc::AESCipherCBC;
 use self::cbc_decrypt::decrypt_aes_cbc_test;
