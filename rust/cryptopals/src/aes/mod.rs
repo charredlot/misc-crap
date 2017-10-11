@@ -19,6 +19,58 @@ use std::str;
 
 const AES_BLOCK_SIZE: usize = 16;
 
+pub fn encrypt_block(key_schedule: &Vec<Vec<u8>>,
+                     plaintext: &[u8]) -> Vec<u8> {
+    let rounds = key_schedule.len() - 1;
+    assert!(rounds == 10 || rounds == 12 || rounds == 14,
+            "key_schedule was unexpected length {}", key_schedule.len());
+
+    let mut state = AESBlock::from_slice(plaintext);
+
+    // initial round
+    state.add_round_key(&key_schedule[0]);
+
+    for i in 1..rounds {
+        state.sub_bytes();
+        state.shift_rows();
+        state.mix_columns();
+        state.add_round_key(&key_schedule[i]);
+    }
+
+    state.sub_bytes();
+    state.shift_rows();
+    state.add_round_key(&key_schedule[rounds]);
+
+    state.values.to_vec()
+}
+
+pub fn decrypt_block(key_schedule: &Vec<Vec<u8>>,
+                     ciphertext: &[u8]) -> Vec<u8> {
+    let rounds = key_schedule.len() - 1;
+    assert!(rounds == 10 || rounds == 12 || rounds == 14,
+            "key_schedule was unexpected length {}", key_schedule.len());
+
+    let mut state = AESBlock::from_slice(ciphertext);
+
+    // inverse final round
+    state.add_round_key(&key_schedule[rounds]);
+    state.inv_shift_rows();
+    state.inv_sub_bytes();
+
+
+    for i in (1..rounds).rev() {
+        state.add_round_key(&key_schedule[i]);
+        state.inv_mix_columns();
+        state.inv_shift_rows();
+        state.inv_sub_bytes();
+    }
+
+    // inverse initial round
+    state.add_round_key(&key_schedule[0]);
+
+    state.values.to_vec()
+}
+
 struct AESBlock {
     values: [u8; AES_BLOCK_SIZE],
 }
@@ -226,77 +278,22 @@ pub fn expand_key(key: &[u8]) -> Vec<Vec<u8>> {
 }
 
 pub struct AESCipherOld {
-    key_schedule: Vec<Vec<u8>>,
-    rounds: usize,
+    key_schedule: Vec<Vec<u8>>
 }
 
 impl AESCipherOld {
     pub fn new(key: &[u8]) -> AESCipherOld {
-        let key_size = key.len();
-
-        let rounds: usize = match key_size {
-            // from AES spec
-            16 => 10,  // 128
-            24 => 12,  // 192
-            32 => 14,  // 256
-            // XXX: return error instead of panicking
-            _ => panic!("bad key len {}", key_size)
-        };
-
         // XXX: could pack encrypt/decrypt in a closure like go does?
         AESCipherOld {
             key_schedule: expand_key(key),
-            rounds: rounds,
         }
-    }
-
-    fn encrypt_block(&self, plaintext: &[u8]) -> Vec<u8> {
-        let mut state = AESBlock::from_slice(plaintext);
-
-        // initial round
-        state.add_round_key(&self.key_schedule[0]);
-
-        for i in 1..self.rounds {
-            state.sub_bytes();
-            state.shift_rows();
-            state.mix_columns();
-            state.add_round_key(&self.key_schedule[i]);
-        }
-
-        state.sub_bytes();
-        state.shift_rows();
-        state.add_round_key(&self.key_schedule[self.rounds]);
-
-        state.values.to_vec()
-    }
-
-    fn decrypt_block(&self, plaintext: &[u8]) -> Vec<u8> {
-        let mut state = AESBlock::from_slice(plaintext);
-
-        // inverse final round
-        state.add_round_key(&self.key_schedule[self.rounds]);
-        state.inv_shift_rows();
-        state.inv_sub_bytes();
-
-
-        for i in (1..self.rounds).rev() {
-            state.add_round_key(&self.key_schedule[i]);
-            state.inv_mix_columns();
-            state.inv_shift_rows();
-            state.inv_sub_bytes();
-        }
-
-        // inverse initial round
-        state.add_round_key(&self.key_schedule[0]);
-
-        state.values.to_vec()
     }
 
     fn ecb_encrypt(&self, plaintext: &[u8]) -> Vec<u8> {
         let mut result: Vec<u8> = Vec::new();
 
         for chunk in plaintext.chunks(AES_BLOCK_SIZE) {
-            let mut block = self.encrypt_block(chunk);
+            let mut block: Vec<u8> = encrypt_block(&self.key_schedule, chunk);
             result.append(&mut block)
         }
 
@@ -311,7 +308,7 @@ impl AESCipherOld {
         let mut result: Vec<u8> = Vec::new();
 
         for chunk in ciphertext.chunks(AES_BLOCK_SIZE) {
-            let mut block = self.decrypt_block(chunk);
+            let mut block = decrypt_block(&self.key_schedule, chunk);
             result.append(&mut block)
         }
 
@@ -332,7 +329,7 @@ impl AESCipherOld {
         let mut result: Vec<u8> = Vec::new();
         for block in plaintext.chunks(AES_BLOCK_SIZE) {
             let mixed = fixed_xor(block, &iv);
-            let encrypted = self.encrypt_block(&mixed);
+            let encrypted = encrypt_block(&self.key_schedule, &mixed);
             result.extend(encrypted.iter().cloned());
             for (dst, src) in iv.iter_mut().zip(&encrypted) {
                 *dst = *src;
@@ -356,7 +353,8 @@ impl AESCipherOld {
         }
         let mut result: Vec<u8> = Vec::new();
         for block in ciphertext.chunks(AES_BLOCK_SIZE) {
-            result.append(&mut fixed_xor(&self.decrypt_block(block), &iv));
+            let decrypted_block = decrypt_block(&self.key_schedule, block);
+            result.append(&mut fixed_xor(&decrypted_block, &iv));
             for (dst, src) in iv.iter_mut().zip(block) {
                 *dst = *src;
             }
@@ -549,14 +547,15 @@ pub fn aes_test() {
     ];
 
     for &(key, plaintext, expected_ciphertext) in &encrypt_tests {
-        let cipher = AESCipherOld::new(&hex_to_bytes(key));
-        let ciphertext = cipher.encrypt_block(&hex_to_bytes(plaintext));
+        let key_schedule = expand_key(&hex_to_bytes(key));
+        let ciphertext = encrypt_block(&key_schedule,
+                                       &hex_to_bytes(plaintext));
         if ciphertext != hex_to_bytes(expected_ciphertext) {
             panic!("FAILED: encrypt expected {} got {}",
                    expected_ciphertext, bytes_to_hex(&ciphertext));
         }
 
-        let decrypted = cipher.decrypt_block(&ciphertext);
+        let decrypted = decrypt_block(&key_schedule, &ciphertext);
         if decrypted != hex_to_bytes(plaintext) {
             panic!("FAILED: decrypt expected {} got {}",
                    plaintext, bytes_to_hex(&decrypted));
