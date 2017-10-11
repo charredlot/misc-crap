@@ -17,7 +17,7 @@ impl AESCipher for AESCipherECB {
         let mut result: Vec<u8> = Vec::new();
 
         for chunk in plaintext.chunks(AES_BLOCK_SIZE) {
-            let mut block: Vec<u8> = encrypt_block(&self.key_schedule, chunk);
+            let mut block = encrypt_block(&self.key_schedule, chunk);
             result.append(&mut block)
         }
 
