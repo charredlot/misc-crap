@@ -173,13 +173,13 @@ impl AESBlock {
     }
 }
 
-pub struct AESCipher {
+pub struct AESCipherOld {
     key_schedule: Vec<Vec<u8>>,
     rounds: usize,
 }
 
-impl AESCipher {
-    pub fn new(key: &[u8]) -> AESCipher {
+impl AESCipherOld {
+    pub fn new(key: &[u8]) -> AESCipherOld {
         let key_size = key.len();
 
         let rounds: usize = match key_size {
@@ -192,8 +192,8 @@ impl AESCipher {
         };
 
         // XXX: could pack encrypt/decrypt in a closure like go does?
-        AESCipher {
-            key_schedule: AESCipher::expand_key(key),
+        AESCipherOld {
+            key_schedule: AESCipherOld::expand_key(key),
             rounds: rounds,
         }
     }
@@ -450,7 +450,7 @@ fn expand_key_test() {
     ];
 
     for &(key, expected) in &tests {
-        let expanded = AESCipher::expand_key(&key);
+        let expanded = AESCipherOld::expand_key(&key);
         for ((i, chunk), block) in
              expected.chunks(AES_BLOCK_SIZE).enumerate().zip(expanded) {
             if block != chunk {
@@ -528,7 +528,7 @@ fn detect_aes_ecb_in_file(filename: &str) {
 
 fn decrypt_aes_cbc_base64_file(filename: &str, key: &[u8], iv: &[u8]) {
     let f = base64_decode_file(filename);
-    let cipher = AESCipher::new(key);
+    let cipher = AESCipherOld::new(key);
     let decrypted_bytes = cipher.cbc_decrypt(iv, &f);
     let decrypted = str::from_utf8(&pkcs7_unpad(&decrypted_bytes,
                                                 AES_BLOCK_SIZE)).unwrap();
@@ -549,7 +549,7 @@ pub fn aes_test() {
     ];
 
     for &(key, plaintext, expected_ciphertext) in &encrypt_tests {
-        let cipher = AESCipher::new(&hex_to_bytes(key));
+        let cipher = AESCipherOld::new(&hex_to_bytes(key));
         let ciphertext = cipher.encrypt_block(&hex_to_bytes(plaintext));
         if ciphertext != hex_to_bytes(expected_ciphertext) {
             panic!("FAILED: encrypt expected {} got {}",
@@ -564,7 +564,7 @@ pub fn aes_test() {
     }
 
     let f = base64_decode_file("data/1.7.txt");
-    let cipher = AESCipher::new("YELLOW SUBMARINE".as_bytes());
+    let cipher = AESCipherOld::new("YELLOW SUBMARINE".as_bytes());
     let decrypted_bytes = cipher.ecb_decrypt(&f);
     let decrypted = str::from_utf8(pkcs7_unpad(&decrypted_bytes,
                                                AES_BLOCK_SIZE)).unwrap();

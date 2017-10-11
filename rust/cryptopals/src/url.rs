@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::str;
 
-use aes::AESCipher;
+use aes::AESCipherOld;
 use pkcs7::pkcs7_pad;
 
 pub fn url_decode(params: &str) -> HashMap<String, String> {
@@ -53,18 +53,18 @@ fn profile_for(email: &str) -> String {
     s
 }
 
-fn encrypt_profile_for(cipher: &AESCipher, email: &str) -> Vec<u8> {
+fn encrypt_profile_for(cipher: &AESCipherOld, email: &str) -> Vec<u8> {
     cipher.ecb_pad_and_encrypt(profile_for(email).as_bytes())
 }
 
-fn decrypt_profile_for(cipher: &AESCipher,
+fn decrypt_profile_for(cipher: &AESCipherOld,
                        ciphertext: &[u8]) -> HashMap<String, String> {
     let buf = cipher.ecb_decrypt_and_unpad(ciphertext);
     let s = str::from_utf8(&buf).unwrap();
     url_decode(s)
 }
 
-fn trick_url_decode(cipher: &AESCipher) {
+fn trick_url_decode(cipher: &AESCipherOld) {
     // &uid=10&role= is 13 characters, so we need 3 more to form middle block
     // 012345678901234567890123456789
     // email=foo01@bar.com&uid=10&role=
@@ -108,7 +108,7 @@ pub fn url_test() {
     println!("url_decode: {:?}", map);
 
     let key = "YELLOW SUBMARINE".as_bytes();
-    let cipher = AESCipher::new(key);
+    let cipher = AESCipherOld::new(key);
     let ciphertext = encrypt_profile_for(&cipher, "foo@bar.com");
     let out = decrypt_profile_for(&cipher, &ciphertext);
     println!("foo@bar.com encrypt and decrypt: {:?}", out);

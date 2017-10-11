@@ -3,7 +3,7 @@ extern crate rand;
 use std::collections::HashMap;
 use std::str;
 
-use aes::{AESCipher, AES_BLOCK_SIZE};
+use aes::{AESCipherOld, AES_BLOCK_SIZE};
 use base64::base64_decode;
 use util::{rand_key, rand_bytes, EncryptOracle};
 
@@ -12,7 +12,7 @@ const ORACLE_SUFFIX: &'static str = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9
 const ORACLE_SUFFIX_STR: &'static str = "Rollin' in my 5.0\nWith my rag-top down so my hair can blow\nThe girlies on standby waving just to say hi\nDid you stop? No, I just drove by\n";
 
 fn get_encrypt_aes_ecb_suffix_oracle(key: &[u8]) -> Box<EncryptOracle> {
-    let cipher = AESCipher::new(key);
+    let cipher = AESCipherOld::new(key);
 
     Box::new(move |plaintext: &[u8]| -> Vec<u8> {
         let mut suffixed = plaintext.to_vec();
@@ -26,7 +26,7 @@ fn gen_encrypt_aes_ecb_sandwich_oracle(key: &[u8],
                                             Box<EncryptOracle> {
     let v = rand_bytes(prefix_len);
 
-    let cipher = AESCipher::new(key);
+    let cipher = AESCipherOld::new(key);
     Box::new(move |plaintext: &[u8]| -> Vec<u8> {
         let mut sandwich = v.to_vec();
         sandwich.extend_from_slice(plaintext);
