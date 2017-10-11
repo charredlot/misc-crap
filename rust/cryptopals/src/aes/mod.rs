@@ -173,6 +173,58 @@ impl AESBlock {
     }
 }
 
+pub fn expand_key(key: &[u8]) -> Vec<Vec<u8>> {
+    // from the wiki for Rijndael key schedule
+    let (n, b) = match key.len() {
+        16 => (16, 176),
+        24 => (24, 208),
+        32 => (32, 240),
+        // XXX: return error instead of panicking
+        _ => panic!("bad key len {}", key.len())
+    };
+
+    let mut expanded: Vec<u8> = Vec::with_capacity(b);
+
+    // put in original key
+    for &b in key {
+        expanded.push(b);
+    }
+
+
+    let mut rcon_i = 1;
+    let mut t = [0u8; 4];
+    // XXX: could rust optimize better with local length variable?
+    while expanded.len() < b {
+        for j in 0..4 {
+            t[j] = expanded[expanded.len() + j - 4];
+        }
+
+        if expanded.len() % n == 0 {
+            rijndael_core(&mut t, rcon_i);
+            rcon_i += 1;
+        }
+
+        if n == 32 && (expanded.len() % 32 == 16) {
+            // 256-bit keys have an extra sbox step for some reason
+            for j in 0..4 {
+                t[j] = SBOX[t[j] as usize];
+            }
+        }
+
+        for j in 0..4 {
+            let prev = expanded[expanded.len() - n];
+            expanded.push(t[j] ^ prev);
+        }
+    }
+
+    let mut keys: Vec<Vec<u8>> = Vec::new();
+    for chunk in expanded.chunks(AES_BLOCK_SIZE) {
+        keys.push(chunk.to_vec());
+    }
+
+    keys
+}
+
 pub struct AESCipherOld {
     key_schedule: Vec<Vec<u8>>,
     rounds: usize,
@@ -193,61 +245,9 @@ impl AESCipherOld {
 
         // XXX: could pack encrypt/decrypt in a closure like go does?
         AESCipherOld {
-            key_schedule: AESCipherOld::expand_key(key),
+            key_schedule: expand_key(key),
             rounds: rounds,
         }
-    }
-
-    fn expand_key(key: &[u8]) -> Vec<Vec<u8>> {
-        // from the wiki for Rijndael key schedule
-        let (n, b) = match key.len() {
-            16 => (16, 176),
-            24 => (24, 208),
-            32 => (32, 240),
-            // XXX: return error instead of panicking
-            _ => panic!("bad key len {}", key.len())
-        };
-
-        let mut expanded: Vec<u8> = Vec::with_capacity(b);
-
-        // put in original key
-        for &b in key {
-            expanded.push(b);
-        }
-
-
-        let mut rcon_i = 1;
-        let mut t = [0u8; 4];
-        // XXX: could rust optimize better with local length variable?
-        while expanded.len() < b {
-            for j in 0..4 {
-                t[j] = expanded[expanded.len() + j - 4];
-            }
-
-            if expanded.len() % n == 0 {
-                rijndael_core(&mut t, rcon_i);
-                rcon_i += 1;
-            }
-
-            if n == 32 && (expanded.len() % 32 == 16) {
-                // 256-bit keys have an extra sbox step for some reason
-                for j in 0..4 {
-                    t[j] = SBOX[t[j] as usize];
-                }
-            }
-
-            for j in 0..4 {
-                let prev = expanded[expanded.len() - n];
-                expanded.push(t[j] ^ prev);
-            }
-        }
-
-        let mut keys: Vec<Vec<u8>> = Vec::new();
-        for chunk in expanded.chunks(AES_BLOCK_SIZE) {
-            keys.push(chunk.to_vec());
-        }
-
-        keys
     }
 
     fn encrypt_block(&self, plaintext: &[u8]) -> Vec<u8> {
@@ -450,7 +450,7 @@ fn expand_key_test() {
     ];
 
     for &(key, expected) in &tests {
-        let expanded = AESCipherOld::expand_key(&key);
+        let expanded = expand_key(&key);
         for ((i, chunk), block) in
              expected.chunks(AES_BLOCK_SIZE).enumerate().zip(expanded) {
             if block != chunk {
