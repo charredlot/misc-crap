@@ -2,6 +2,8 @@ use std::cmp;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::str;
+
+use charfreq::EnglishCharScore;
 use hex::{bytes_to_hex, hex_to_bytes};
 
 pub fn fixed_xor(buf: &[u8], key: &[u8]) -> Vec<u8> {
@@ -19,61 +21,27 @@ pub fn slice_xor_inplace(dst: &mut [u8], src: &[u8]) {
     }
 }
 
-const ENGLISH_BYTE_SCALE: u64 = 10000;
-const ENGLISH_BYTE_FREQS: [u64; 256] = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    1076, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 724, 132, 241, 385, 1072, 205, 180, 528, 651, 9, 61, 355, 233, 619, 685,
-    162, 10, 537, 560, 811, 256, 98, 186, 15, 188, 6, 0, 0, 0, 0, 0,
-    0, 724, 132, 241, 385, 1072, 205, 180, 528, 651, 9, 61, 355, 233, 619, 685,
-    162, 10, 537, 560, 811, 256, 98, 186, 15, 188, 6, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-];
-
-fn english_freq_score(freqs: &[u64; 256], total: u64) -> u64 {
-    let mut score: u64 = 0;
-    for (&freq, &expected_freq) in freqs.iter().zip(ENGLISH_BYTE_FREQS.iter()) {
-        let normalized_freq = (freq * ENGLISH_BYTE_SCALE) / total;
-        let diff = (expected_freq as i64) - (normalized_freq as i64);
-        // chi squared doesn't behave well if expected values are 0
-        // could do fisher's exact test or barnard's exact test but seems overkill
-        // so just do simple diff addition
-        score += diff.abs() as u64;
+pub fn slice_xor(left: &[u8], right: &[u8]) -> Vec<u8> {
+    let mut res = Vec::new();
+    for (l, r) in left.iter().zip(right) {
+        res.push(*l ^ *r);
     }
-    score
+    res
 }
 
 /// Returns key, score
 pub fn guess_byte_xor_cipher(buf: &[u8]) -> (u8, u64) {
-    let mut low_score: u64 = u64::max_value();
-    let mut low_key: u8 = 0;
-
+    let mut score = EnglishCharScore::new();
     for i in 0..256 {
         let key = i as u8;
-        let mut freq = [0u64; 256];
 
         for &b in buf {
-            let candidate = b ^ key;
-            freq[candidate as usize] += 1;
+            score.add_byte(b ^ key);
         }
-
-        let score = english_freq_score(&freq, buf.len() as u64);
-        if score < low_score {
-            // XXX: same score?
-            low_score = score;
-            low_key = key;
-        }
+        score.update_best(key);
     }
-    (low_key, low_score)
+    let (low_score, low_key) = score.get_best();
+    (low_key.unwrap(), low_score)
 }
 
 /// Returns best_decrypted_line, best_line_number
