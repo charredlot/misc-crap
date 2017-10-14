@@ -1,4 +1,33 @@
+extern crate rand;
+
 use mt19937::MT19937;
+use self::rand::Rng;
+
+fn brute_force_timestamp_seed(val: u32,
+                              start: u32, end: u32) -> Result<u32, ()> {
+    for i in start..end {
+        let mut mt = MT19937::new(i);
+        if mt.extract32() == val {
+            return Ok(i);
+        }
+    }
+
+    Err(())
+}
+
+fn timestamp_seed_test() {
+    let range = 1000;
+    let mut rng = rand::thread_rng();
+    let seed = rng.gen_range(range, u32::max_value() - (range * 2)) as u32;
+
+    println!("Brute forcing seed {}", seed); 
+    let mut mt = MT19937::new(seed);
+    let brute_forced_seed = brute_force_timestamp_seed(mt.extract32(),
+                                                       seed - range,
+                                                       seed + range).unwrap();
+    assert!(seed == brute_forced_seed,
+            "seed {} != brute_forced_seed {}", seed, brute_forced_seed);
+}
 
 pub fn mt19937_test() {
     let mut mt = MT19937::new(1);
@@ -10,6 +39,7 @@ pub fn mt19937_test() {
                 val, MT19937_SEED_1[i], i);
     }
 
+    timestamp_seed_test();
     println!("Finished Mersenne twister 19937 tests");
 }
 
