@@ -1,5 +1,7 @@
 extern crate rand;
 
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use self::rand::Rng;
 
 pub type EncryptOracle = Fn (&[u8]) -> Vec<u8>;
@@ -21,4 +23,13 @@ pub fn rand_key() -> [u8; 16] {
         key[i] = rng.gen_range(0, 256 as usize) as u8;
     }
     key
+}
+
+pub fn unix_timestamp_sec() -> i64{
+    // this is painful :/
+    let now = SystemTime::now();
+    match now.duration_since(UNIX_EPOCH) {
+        Ok(duration) => duration.as_secs() as i64,
+        Err(_) => 0 as i64, // can't handle negative times for now :/
+    }
 }
