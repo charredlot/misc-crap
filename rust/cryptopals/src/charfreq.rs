@@ -69,7 +69,13 @@ pub fn english_freq_score(freqs: &[u64; 256], total: u64) -> u64 {
     for (&freq, &expected_freq) in
         freqs.iter().zip(ENGLISH_BYTE_FREQS.iter()) {
         let normalized_freq = (freq * ENGLISH_BYTE_SCALE) / total;
-        let diff = (expected_freq as i64) - (normalized_freq as i64);
+        let mut diff = (expected_freq as i64) - (normalized_freq as i64);
+        if expected_freq == 0 && freq > 0 {
+            // unexpected characters like ^ should be penalized more probably
+            // this is kind of a hack for now though
+            diff *= 2;
+        }
+
         // chi squared doesn't behave well if expected values are 0
         // could do fisher's exact test or barnard's exact test but seems
         // overkill so just do simple diff addition
