@@ -37,6 +37,20 @@ impl MT19937 {
         mt
     }
 
+    pub fn state_size() -> usize {
+        N
+    }
+
+    pub fn clone_from_state(state: &[u32]) -> MT19937 {
+        assert!(state.len() == N);
+        let mut mt = MT19937 {
+            state: [0u32; N],
+            index: N,
+        };
+        mt.state.clone_from_slice(state);
+        mt
+    }
+
     fn twist(&mut self) {
         for i in 0..N {
             let x = (self.state[i] & MASK_UPPER) +

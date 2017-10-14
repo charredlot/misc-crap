@@ -74,6 +74,24 @@ fn untemper_test(full: bool) {
     }
 }
 
+fn clone_test() {
+    let mut rng = rand::thread_rng();
+    let seed = rng.gen_range(0, u32::max_value()) as u32;
+
+    println!("Cloning Mersenne twister with seed {}", seed);
+    let n = MT19937::state_size();
+    let mut state: Vec<u32> = Vec::with_capacity(n);
+    let mut mt = MT19937::new(seed);
+    for _ in 0..n {
+        state.push(MT19937::untemper(mt.extract32()));
+    }
+
+    let mut cloned = MT19937::clone_from_state(&state);
+    for _ in 0..n * 2 {
+        assert!(mt.extract32() == cloned.extract32());
+    }
+}
+
 pub fn mt19937_test() {
     let mut mt = MT19937::new(1);
 
@@ -86,6 +104,7 @@ pub fn mt19937_test() {
 
     timestamp_seed_test();
     untemper_test(false);
+    clone_test();
 
     println!("Finished Mersenne twister 19937 tests");
 }
