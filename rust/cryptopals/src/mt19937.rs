@@ -157,4 +157,23 @@ impl MT19937 {
 
         y
     }
+
+    pub fn encrypt(seed: u16, plaintext: &[u8]) -> Vec<u8> {
+        let mut ciphertext = Vec::with_capacity(plaintext.len());
+
+        let mut mt = MT19937::new(seed as u32);
+        for chunk in plaintext.chunks(4) {
+            let key32 = mt.extract32();
+            for (i, &b) in chunk.iter().enumerate() {
+                let shift = (3 - i) * 8;
+                ciphertext.push(((key32 >> shift) & 0xFF) as u8 ^ b);
+            }
+        }
+        ciphertext
+    }
+
+    pub fn decrypt(seed: u16, ciphertext: &[u8]) -> Vec<u8> {
+        // since it's an xor stream cipher, same logic to reverse
+        MT19937::encrypt(seed, ciphertext)
+    }
 }

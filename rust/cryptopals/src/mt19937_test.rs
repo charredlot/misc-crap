@@ -4,6 +4,8 @@ use std::thread;
 
 use mt19937::MT19937;
 use self::rand::Rng;
+use util::rand_bytes;
+use xor::slice_xor_inplace;
 
 fn brute_force_timestamp_seed(val: u32,
                               start: u32, end: u32) -> Result<u32, ()> {
@@ -92,6 +94,40 @@ fn clone_test() {
     }
 }
 
+fn stream_cipher_test() {
+    let mut rng = rand::thread_rng();
+    let seed = rng.gen_range(0, u16::max_value()) as u16;
+    let prefix_len = rng.gen_range(7, 256);
+
+    let mut plaintext = rand_bytes(prefix_len);
+    println!("Brute forcing Mersenne twister 16-bit seed {} prefix {:?}",
+             seed, plaintext);
+
+    let trailer = "ABCDEFGH01234567".as_bytes();
+    plaintext.extend_from_slice(trailer);
+
+    let trailer_offset = plaintext.len() - trailer.len();
+
+    let mut ciphertext = MT19937::encrypt(seed, &plaintext);
+    let trailer_ciphertext = &mut ciphertext[trailer_offset..];
+    slice_xor_inplace(trailer_ciphertext, trailer);
+
+    let mut found = false;
+    for i in 0..u16::max_value() as usize + 1 {
+        let guess_seed = i as u16;
+        let mut guess_ciphertext = MT19937::encrypt(guess_seed, &plaintext);
+        let guess_trailer_ciphertext = &mut guess_ciphertext[trailer_offset..];
+        slice_xor_inplace(guess_trailer_ciphertext, trailer);
+
+        if guess_trailer_ciphertext == trailer_ciphertext {
+            assert!(seed == guess_seed);
+            found = true;
+            break;
+        }
+    }
+    assert!(found, "matching seed not found");
+}
+
 pub fn mt19937_test() {
     let mut mt = MT19937::new(1);
 
@@ -105,6 +141,7 @@ pub fn mt19937_test() {
     timestamp_seed_test();
     untemper_test(false);
     clone_test();
+    stream_cipher_test();
 
     println!("Finished Mersenne twister 19937 tests");
 }
