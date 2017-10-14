@@ -56,12 +56,91 @@ impl MT19937 {
             self.twist();
         }
 
-        let mut y = self.state[self.index];
+        let y = self.state[self.index];
         self.index += 1;
+        MT19937::temper(y)
+    }
+
+    pub fn temper(initial: u32) -> u32 {
+        let mut y = initial;
+        //println!("boop temper {:08x}", y);
         y ^= (y >> U) & D;
+        //println!("boop temper {:08x}", y);
         y ^= (y << S) & B;
+        //println!("boop temper {:08x}", y);
         y ^= (y << T) & C;
+        //println!("boop temper {:08x}", y);
         y ^= y >> L;
+        //println!("boop temper {:08x}", y);
+        y
+    }
+
+    pub fn untemper(initial: u32) -> u32 {
+        let mut y = initial;
+        //println!("boop untemper {:08x}", y);
+
+        // y ^= y >> 18
+        // top 14 bits are xor'd into bottom 14 bits
+        // that means top 18 bits are the same, so
+        // we can just do the same thing to invert
+        y ^= y >> L;
+        //println!("boop untemper {:08x}", y);
+
+        // y ^= (y << T) & C;
+        // y ^= (y << 15) & 0xEFC60000
+        // bottom 15 bits are unchanged
+        // can get next 15 bits by doing transform again
+        // now that we have orig bits 0..30, we can do transform again
+        // to get the top 2 bits
+        // trick is to only modify bits we care about
+        //
+        // new_y31 = orig_y31 ^ (orig_y16 & C31)
+        // new_y16 = orig_y16 ^ (orig_y01 & C31)
+        // orig_y01 = orig_y01
+        // =>
+        // orig_y31 = new_y31 ^ (orig_y16 & C31)
+        // orig_y31 = new_y31 ^ ((new_y16 ^ (orig_y01 & C16)) & C31)
+        // restore bits 15..30 by doing the transform and masking
+        // then only 2 bits left, can do it again to get the last 2
+        let mut mask: u32 = (1 << T) - 1;
+        // bits 15..30
+        mask = mask << T;
+        y = ((y ^ ((y << T) & C)) & mask) | (y & !mask);
+        // bits 30..32
+        mask = mask << T;
+        y = ((y ^ ((y << T) & C)) & mask) | (y & !mask);
+        //println!("boop untemper {:08x}", y);
+
+        // y ^= (y << S) & B;
+        // y ^= (y << 7) & 0x9D2C5680
+        mask = (1 << S) - 1;
+        mask = mask << S;
+        y = ((y ^ ((y << S) & B)) & mask) | (y & !mask);
+        // bits 14..21
+        mask = mask << S;
+        y = ((y ^ ((y << S) & B)) & mask) | (y & !mask);
+        // bits 21..28
+        mask = mask << S;
+        y = ((y ^ ((y << S) & B)) & mask) | (y & !mask);
+        // bits 28..32
+        mask = mask << S;
+        y = ((y ^ ((y << S) & B)) & mask) | (y & !mask);
+        //println!("boop untemper {:08x}", y);
+
+        // y ^= (y >> U) & D;
+        // y ^= (y >> 11)
+        // (D is just 32-bit mask)
+        // same thing as above in reverse
+        mask = ((1 << U) - 1) << (32 - U);
+        // bits 21..32 are unchanged
+        // bits 10..21
+        mask = mask >> U;
+        y = ((y ^ (y >> U)) & mask) | (y & !mask);
+        // bits 0..10
+        mask = mask >> U;
+        y = ((y ^ (y >> U)) & mask) | (y & !mask);
+        //println!("boop untemper {:08x}", y);
+
         y
     }
 }

@@ -1,5 +1,7 @@
 extern crate rand;
 
+use std::thread;
+
 use mt19937::MT19937;
 use self::rand::Rng;
 
@@ -29,6 +31,49 @@ fn timestamp_seed_test() {
             "seed {} != brute_forced_seed {}", seed, brute_forced_seed);
 }
 
+fn untemper_single_test(pre: u32) {
+    let tempered = MT19937::temper(pre);
+    let untempered = MT19937::untemper(tempered);
+    assert!(pre == untempered,
+            "untemper failed: input {:08x} tempered {:08x} untempered {:08x}",
+            pre, tempered, untempered);
+}
+
+#[allow(dead_code)]
+fn untemper_test(full: bool) {
+    println!("Verify Mersenne twister 19937 untemper");
+    let mut rng = rand::thread_rng();
+    for _ in 0..64 {
+        let pre = rng.gen_range(0, u32::max_value()) as u32;
+        untemper_single_test(pre);
+    }
+
+    if !full {
+        return;
+    }
+
+    let num_threads = 4;
+    let mut threads = Vec::with_capacity(num_threads);
+    let interval = u32::max_value() as usize / num_threads;
+    for i in 0..num_threads {
+        let start = i  * interval;
+        let end = (i + 1) * interval;
+        threads.push(
+            thread::spawn(move || {
+                for j in start..end {
+                    let pre = j as u32;
+                    if pre % 0x1000000 == 0 {
+                        println!("untemper progress 0x{:08x}", pre);
+                    }
+                    untemper_single_test(pre);
+                }
+            }));
+    }
+    for t in threads {
+        println!("untemper_test thread done {:?}", t.join().unwrap());
+    }
+}
+
 pub fn mt19937_test() {
     let mut mt = MT19937::new(1);
 
@@ -40,6 +85,8 @@ pub fn mt19937_test() {
     }
 
     timestamp_seed_test();
+    untemper_test(false);
+
     println!("Finished Mersenne twister 19937 tests");
 }
 
