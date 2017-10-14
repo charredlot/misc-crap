@@ -4,7 +4,7 @@ use std::thread;
 
 use mt19937::MT19937;
 use self::rand::Rng;
-use util::rand_bytes;
+use util::{rand_bytes, unix_timestamp_sec};
 use xor::slice_xor_inplace;
 
 fn brute_force_timestamp_seed(val: u32,
@@ -128,6 +128,31 @@ fn stream_cipher_test() {
     assert!(found, "matching seed not found");
 }
 
+fn password_reset_token() -> (u32, Vec<u8>) {
+    let seed = unix_timestamp_sec() as u32;
+    let mut mt = MT19937::new(seed);
+    // just use a fixed length
+    (seed, mt.extract_bytes(16))
+}
+
+fn password_reset_token_test() {
+    let (seed, token) = password_reset_token();
+
+    let mut found = false;
+
+    let now = unix_timestamp_sec() as i64;
+    for i in now - 30..now + 30 {
+        let guess_seed = i as u32;
+        let mut mt = MT19937::new(guess_seed);
+        if &mt.extract_bytes(token.len()) == &token {
+            assert!(guess_seed == seed);
+            found = true;
+            break;
+        }
+    }
+    assert!(found);
+}
+
 pub fn mt19937_test() {
     let mut mt = MT19937::new(1);
 
@@ -142,6 +167,7 @@ pub fn mt19937_test() {
     untemper_test(false);
     clone_test();
     stream_cipher_test();
+    password_reset_token_test();
 
     println!("Finished Mersenne twister 19937 tests");
 }

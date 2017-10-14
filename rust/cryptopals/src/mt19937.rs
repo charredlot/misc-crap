@@ -176,4 +176,19 @@ impl MT19937 {
         // since it's an xor stream cipher, same logic to reverse
         MT19937::encrypt(seed, ciphertext)
     }
+
+    pub fn extract_bytes(&mut self, count: usize) -> Vec<u8> {
+        let mut res = Vec::with_capacity(count);
+        let mut src: u32 = 0;
+        for i in 0..count {
+            let rem = i % 4;
+            if rem == 0 {
+                src = self.extract32();
+            }
+            let b = ((src >> (3 - rem) * 8) & 0xFF) as u8;
+            res.push(b);
+
+        }
+        res
+    }
 }
