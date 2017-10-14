@@ -1,4 +1,6 @@
 use std::cmp::max;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::str;
 
 use aes::AESCipher;
@@ -51,21 +53,11 @@ const SET_3_CHALLENGE_19: &'static [&'static str] = &[
     "QSB0ZXJyaWJsZSBiZWF1dHkgaXMgYm9ybi4=",
 ];
 
-fn nonce_reuse_test() {
+fn nonce_reuse_test(ciphertexts: &Vec<Vec<u8>>) {
     // key ^ plaintextA = ciphertextA
     // => key ^ ciphertextA = plaintextA
     // so guess values for key that gives us best character
     // distribution in English across all the ciphertexts
-
-    let key = rand_key();
-    let cipher = AESCipherCTR::new(&key, 0);
-    println!("Starting nonce reuse AES CTR test with key {:?}", &key);
-
-    let mut ciphertexts = Vec::new();
-    for &plaintext in SET_3_CHALLENGE_19 {
-        let ciphertext = cipher.encrypt(&base64_decode(plaintext));
-        ciphertexts.push(ciphertext);
-    }
 
     let max_key_len = (&ciphertexts).iter().map(|x| x.len()).fold(0, max);
 
@@ -77,7 +69,7 @@ fn nonce_reuse_test() {
 
             // oop should've reused byte xor cipher code
             // but this is more readable in hindsight
-            for ciphertext in &ciphertexts {
+            for ciphertext in ciphertexts {
                 if i >= ciphertext.len() {
                     continue;
                 }
@@ -91,7 +83,7 @@ fn nonce_reuse_test() {
         key_guess.push(best_byte.unwrap());
     }
 
-    for ciphertext in &ciphertexts {
+    for ciphertext in ciphertexts {
         let plaintext = slice_xor(&key_guess, &ciphertext);
         let plaintext_str = str::from_utf8(&plaintext).unwrap();
         println!("\"{}\"", plaintext_str);
@@ -100,6 +92,37 @@ fn nonce_reuse_test() {
     }
 
     println!("Ending nonce reuse AES CTR test");
+}
+
+fn nonce_reuse_test_19() {
+    let key = rand_key();
+    let cipher = AESCipherCTR::new(&key, 0);
+    println!("Starting nonce reuse AES CTR test 19 with key {:?}", &key);
+
+    let mut ciphertexts = Vec::new();
+    for &plaintext in SET_3_CHALLENGE_19 {
+        let ciphertext = cipher.encrypt(&base64_decode(plaintext));
+        ciphertexts.push(ciphertext);
+    }
+    nonce_reuse_test(&ciphertexts);
+}
+
+fn nonce_reuse_test_20() {
+    let key = rand_key();
+    let cipher = AESCipherCTR::new(&key, 0);
+    println!("Starting nonce reuse AES CTR test 20 with key {:?}", &key);
+
+    let mut ciphertexts = Vec::new();
+
+    let f = File::open("data/3.20.txt").unwrap();
+    let buffered = BufReader::new(&f);
+    for rline in buffered.lines() {
+        let line = rline.unwrap();
+        let ciphertext = cipher.encrypt(&base64_decode(&line));
+        ciphertexts.push(ciphertext);
+    }
+
+    nonce_reuse_test(&ciphertexts);
 }
 
 pub fn decrypt_aes_ctr_test() {
@@ -118,6 +141,7 @@ pub fn decrypt_aes_ctr_test() {
         }
     }
 
-    nonce_reuse_test();
+    nonce_reuse_test_19();
+    nonce_reuse_test_20();
     println!("Finished AES CTR tests");
 }
