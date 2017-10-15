@@ -25,6 +25,12 @@ pub fn rand_key() -> [u8; 16] {
     key
 }
 
+pub fn rand_u64() -> u64 {
+    let mut rng = rand::thread_rng();
+    // TODO: maybe use u128 when it's available to get the max value + 1
+    rng.gen_range(0, u64::max_value())
+}
+
 pub fn unix_timestamp_sec() -> i64{
     // this is painful :/
     let now = SystemTime::now();
