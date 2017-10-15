@@ -463,7 +463,7 @@ fn decrypt_aes_cbc_base64_file(filename: &str, key: &[u8], iv: &[u8]) {
     println!("AES CBC decrypt {}:\n{}", filename, decrypted);
 }
 
-pub fn aes_test() {
+pub fn aes_test(full_test: bool) {
     expand_key_test();
     mix_columns_test();
 
@@ -508,7 +508,9 @@ pub fn aes_test() {
     decrypt_aes_ctr_test();
 
     decrypt_aes_ecb_simple_test();
-    decrypt_aes_ecb_sandwich_test();
+    if full_test {
+        decrypt_aes_ecb_sandwich_test();
+    }
     decrypt_aes_cbc_test();
     println!("Finished AES tests");
 }
