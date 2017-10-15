@@ -1,5 +1,7 @@
+use std::cmp::min;
+
 use aes::{AESCipher, expand_key, encrypt_block, AES_BLOCK_SIZE};
-use xor::slice_xor_inplace;
+use xor::{slice_xor, slice_xor_inplace};
 
 pub struct AESCipherCTR {
     // XXX: don't allow control of counter for now
@@ -33,6 +35,50 @@ impl AESCipherCTR {
         }
 
         result
+    }
+
+    pub fn edit(&self, ciphertext: &mut [u8], offset: usize,
+                new_plaintext: &[u8]) {
+        assert!(offset + new_plaintext.len() <= ciphertext.len());
+
+        let mut counter = vec![0u8; AES_BLOCK_SIZE];
+        u64_fill_slice_le(&mut counter[..8], self.nonce_le);
+
+        let mut counter_val = (offset / AES_BLOCK_SIZE) as u64;
+        let mut old_offset = offset;
+        let mut new_offset = 0;
+
+        while old_offset < ciphertext.len() &&
+                new_offset < new_plaintext.len() {
+            u64_fill_slice_le(&mut counter[8..], counter_val);
+            let key_block = encrypt_block(&self.key_schedule, &counter);
+
+            let block_start = counter_val as usize * AES_BLOCK_SIZE;
+            let block_end = min(block_start + AES_BLOCK_SIZE,
+                                ciphertext.len());
+            let mut plain_block =
+                slice_xor(&key_block, &ciphertext[block_start..block_end]);
+
+            let rem = old_offset % AES_BLOCK_SIZE;
+            let new_len = AES_BLOCK_SIZE - rem;
+            let new_end = min(new_offset + new_len, new_plaintext.len());
+            for (dst, src) in plain_block[rem..].iter_mut().zip(
+                    &new_plaintext[new_offset..new_end]) {
+                *dst = *src;
+            }
+
+            // yikes lol
+            for ((dst, kb), pb) in ciphertext[block_start..block_end]
+                                    .iter_mut()
+                                    .zip(&key_block)
+                                    .zip(&plain_block) {
+                *dst = *kb ^ *pb;
+            }
+
+            old_offset = old_offset + new_len;
+            new_offset += new_len;
+            counter_val += 1;
+        }
     }
 }
 

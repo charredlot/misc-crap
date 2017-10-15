@@ -5,10 +5,11 @@ use std::str;
 
 use aes::AESCipher;
 use aes::ctr::AESCipherCTR;
-use base64::base64_decode;
+use aes::ecb::AESCipherECB;
+use base64::{base64_decode, base64_decode_file};
 use charfreq::EnglishCharScore;
-use util::rand_key;
-use xor::slice_xor;
+use util::{rand_key, rand_u64};
+use xor::{slice_xor, slice_xor_inplace};
 
 const SET_3_CHALLENGE_19: &'static [&'static str] = &[
     "SSBoYXZlIG1ldCB0aGVtIGF0IGNsb3NlIG9mIGRheQ==",
@@ -125,6 +126,45 @@ fn nonce_reuse_test_20() {
     nonce_reuse_test(&ciphertexts);
 }
 
+fn edit_test() {
+    let tests = [
+        (&['A' as u8; 32] as &[u8], 0, &[0u8; 9] as &[u8]),
+        (&['A' as u8; 32] as &[u8], 0, &[0u8; 16] as &[u8]),
+        (&['A' as u8; 32] as &[u8], 0, &[0u8; 17] as &[u8]),
+        (&['A' as u8; 32] as &[u8], 15, &[0u8; 5] as &[u8]),
+        (&['A' as u8; 32] as &[u8], 15, &[0u8; 17] as &[u8]),
+        (&['A' as u8; 64] as &[u8], 16, &[0u8; 32] as &[u8]),
+        (&['A' as u8; 64] as &[u8], 31, &[0u8; 32] as &[u8]),
+    ];
+    for &(plaintext, offset, replacetext) in &tests {
+        let cipher = AESCipherCTR::new("YELLOW SUBMARINE".as_bytes(), 0);
+        let mut ciphertext = cipher.encrypt(&plaintext);
+        cipher.edit(&mut ciphertext, offset, &replacetext);
+        let modified = cipher.decrypt(&ciphertext);
+        assert!(&modified[offset..offset + replacetext.len()] == replacetext,
+                "got {:?} expected {:?}", modified, replacetext);
+    }
+}
+
+fn random_access_test() {
+    edit_test();
+
+    let from_file = base64_decode_file("data/1.7.txt");
+    let ecb = AESCipherECB::new("YELLOW SUBMARINE".as_bytes());
+    let plaintext = ecb.decrypt_and_unpad(&from_file);
+    let cipher = AESCipherCTR::new(&rand_key(), rand_u64());
+    let ciphertext = cipher.encrypt(&plaintext);
+
+    // given ciphertext get original plaintext with edit function
+    // by just encrypting 0s...xor with 0 should be the keystream bit
+    let mut keystream = ciphertext.clone();
+    let empty = vec!(0u8; keystream.len());
+    cipher.edit(&mut keystream, 0, &empty);
+
+    slice_xor_inplace(&mut keystream, &ciphertext);
+    assert!(&plaintext == &keystream);
+}
+
 pub fn decrypt_aes_ctr_test() {
     let encoded = "L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ==";
     let expected = "Yo, VIP Let's kick it Ice, Ice, baby Ice, Ice, baby ";
@@ -141,6 +181,7 @@ pub fn decrypt_aes_ctr_test() {
         }
     }
 
+    random_access_test();
     nonce_reuse_test_19();
     nonce_reuse_test_20();
     println!("Finished AES CTR tests");
