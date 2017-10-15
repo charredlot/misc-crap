@@ -3,11 +3,12 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::str;
 
-use aes::AESCipher;
+use aes::{AESCipher, AES_BLOCK_SIZE};
 use aes::ctr::AESCipherCTR;
 use aes::ecb::AESCipherECB;
 use base64::{base64_decode, base64_decode_file};
 use charfreq::EnglishCharScore;
+use ssv::{SSV_PREFIX, ssv_aes_encrypt, ssv_aes_decrypt, has_admin};
 use util::{rand_key, rand_u64};
 use xor::{slice_xor, slice_xor_inplace};
 
@@ -165,6 +166,44 @@ fn random_access_test() {
     assert!(&plaintext == &keystream);
 }
 
+fn bitflip_test() {
+    let key = rand_key();
+    let nonce = rand_u64();
+    println!("AES CTR bitflip admin key {:?} nonce {}", key, nonce);
+    let cipher = AESCipherCTR::new(&key, nonce);
+
+    // need to flip the byte between admin and true to an '='
+    // and the first byte to ';'
+    // use '-' == 0x2d for '=' == 0x3d
+    // use '+' == 0x2b for ';' == 0x3b
+    // add a garbage block in front so we don't modify anything important
+    let mut plaintext: Vec<u8> = vec!['A' as u8; AES_BLOCK_SIZE];
+    plaintext.extend_from_slice("+admin-true".as_bytes());
+    let mut ciphertext = ssv_aes_encrypt(&cipher, &plaintext);
+    // XXX: technically should figure out length of prefix
+    // not sure how to do that with CTR. could get total size of prefix +
+    // suffix by counting bytes then bruteforce backwards until we get
+    // has_admin true.
+
+    {
+        // change '+' to ';'
+        let offset = SSV_PREFIX.len() + AES_BLOCK_SIZE;
+        let b = ciphertext[offset];
+        ciphertext[offset] = (b ^ 0x10u8) | (b & !0x10u8);
+    }
+
+    {
+        // change '-' to '='
+        let offset = SSV_PREFIX.len() + AES_BLOCK_SIZE + ";admin".len();
+        let b = ciphertext[offset];
+        ciphertext[offset] = (b ^ 0x10u8) | (b & !0x10u8);
+    }
+
+    let modified = ssv_aes_decrypt(&cipher, &ciphertext);
+    assert!(has_admin(&modified),
+            "FAILED: AES CTR bitflip test {:?}", &modified);
+}
+
 pub fn decrypt_aes_ctr_test() {
     let encoded = "L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ==";
     let expected = "Yo, VIP Let's kick it Ice, Ice, baby Ice, Ice, baby ";
@@ -181,6 +220,7 @@ pub fn decrypt_aes_ctr_test() {
         }
     }
 
+    bitflip_test();
     random_access_test();
     nonce_reuse_test_19();
     nonce_reuse_test_20();
