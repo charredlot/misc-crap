@@ -6,6 +6,7 @@ pub mod hex;
 pub mod mt19937;
 pub mod mt19937_test;
 pub mod pkcs7;
+pub mod ssv;
 pub mod url;
 pub mod util;
 pub mod xor;

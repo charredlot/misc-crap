@@ -5,49 +5,25 @@ use std::str;
 use aes::{AESCipher, AES_BLOCK_SIZE};
 use aes::cbc::AESCipherCBC;
 use pkcs7::{pkcs7_pad, pkcs7_maybe_unpad_copy};
+use ssv::{SSV_PREFIX, SSV_SUFFIX, ssv_aes_encrypt, ssv_aes_decrypt, has_admin};
 use util::{rand_key, rand_bytes, EncryptOracle, DecryptOracle};
 
 // XXX: should be okay to be constant for this?
 const SSV_IV: [u8; 16] = [7u8; 16];
-const SSV_PREFIX: &'static str = "comment1=cooking%20MCs;userdata=";
-const SSV_SUFFIX: &'static str = ";comment2=%20like%20a%20pound%20of%20bacon";
-
-const ADMIN_STR: &'static str = ";admin=true;";
 
 // ssv: semicolon-separated values
 fn get_encrypt_aes_cbc_ssv_oracle(key: &[u8]) -> Box<EncryptOracle> {
     let cipher = AESCipherCBC::new(key, &SSV_IV);
     Box::new(move |plaintext: &[u8]| -> Vec<u8> {
-        let mut result = SSV_PREFIX.as_bytes().to_vec();
-        // XXX: should strip/escape semicolons and equal signs but
-        // too lazy
-        result.extend_from_slice(plaintext);
-        result.extend_from_slice(SSV_SUFFIX.as_bytes());
-        cipher.pad_and_encrypt(&result)
+        ssv_aes_encrypt(&cipher, plaintext)
     })
 }
 
 fn get_decrypt_aes_cbc_ssv(key: &[u8]) -> Box<DecryptOracle> {
     let cipher = AESCipherCBC::new(key, &SSV_IV);
     Box::new(move |ciphertext: &[u8]| -> Vec<u8> {
-        cipher.decrypt_and_unpad(ciphertext)
+        ssv_aes_decrypt(&cipher, ciphertext)
     })
-}
-
-// XXX: should take a string but we may cause invalid utf8
-fn has_admin_true(buf: &[u8]) -> bool {
-    let match_bytes = ADMIN_STR.as_bytes();
-    let match_len = match_bytes.len();
-    if match_len > buf.len() {
-        return false;
-    }
-
-    for i in 0..(buf.len() - 1 - match_len) {
-        if &buf[i..(i + match_len)] == match_bytes {
-            return true;
-        }
-    }
-    false
 }
 
 fn decrypt_aes_cbc_ssv_bitflip_test() {
@@ -96,11 +72,11 @@ fn decrypt_aes_cbc_ssv_bitflip_test() {
         for (expect_chunk, decrypt_chunk) in
              expected.chunks(AES_BLOCK_SIZE).zip(
               decrypted_bytes.chunks(AES_BLOCK_SIZE)) {
-            println!("boop0 {:?}", expect_chunk);
-            println!("boop1 {:?}", decrypt_chunk);
+            println!("expected  {:?}", expect_chunk);
+            println!("decrypted {:?}", decrypt_chunk);
         }
     }
-    assert!(has_admin_true(&decrypted_bytes));
+    assert!(has_admin(&decrypted_bytes));
     println!("Finished AES CBC bitflip test");
 }
 
@@ -261,6 +237,7 @@ fn decrypt_aes_cbc_padding_test(plaintext: &[u8]) {
 }
 
 pub fn decrypt_aes_cbc_test() {
+    println!("Starting AES CBC decrypt tests");
     decrypt_aes_cbc_ssv_bitflip_test();
     let plaintexts = [
         "1234567890123\x03\x036", // test disambiguating [1] vs [3, 3, 3]
