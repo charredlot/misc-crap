@@ -46,7 +46,7 @@ func WPAPassphraseToPSK(ssid, passphrase string) []byte {
 	return pbkdf2.Key([]byte(passphrase), []byte(ssid), 4096, 32, sha1.New)
 }
 
-func wpaPRF(key, label, input []byte, bits int) []byte {
+func WPAPRF(key, label, input []byte, bits int) []byte {
 	var prefix []byte
 
 	prefix = append(prefix, label...)
@@ -72,7 +72,7 @@ func WPADeriveCCMPPTK(pmk, aa, spa, anonce, snonce []byte) []byte {
 	input = append(input, minThenMax(anonce, snonce)...)
 
 	// CCMP uses PRF-384
-	return wpaPRF(pmk, []byte("Pairwise key expansion"), input, 384)
+	return WPAPRF(pmk, []byte("Pairwise key expansion"), input, 384)
 }
 
 func sliceLessThan(l, r []byte) bool {
