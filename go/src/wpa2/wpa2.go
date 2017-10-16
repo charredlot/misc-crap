@@ -3,43 +3,43 @@ package wpa2
 import (
 	"crypto/hmac"
 	"crypto/sha1"
-    "encoding/binary"
-    "io"
+	"encoding/binary"
+	"io"
 
 	"golang.org/x/crypto/pbkdf2"
 )
 
 type EAPOLFrameHdr struct {
-    Version uint8
-    AuthType uint8 // should be 3 for EAPOL
-    Len uint16
-    KeyDescType uint8
-    KeyInfo uint16
-    KeyLen uint16
-    ReplayCounter uint64
-    KeyNonce [32]uint8
-    KeyIV [16]uint8
-    KeyRSC uint64
-    KeyID uint64
-    KeyMIC [16]uint8
-    KeyDataLen uint16
+	Version       uint8
+	AuthType      uint8 // should be 3 for EAPOL
+	Len           uint16
+	KeyDescType   uint8
+	KeyInfo       uint16
+	KeyLen        uint16
+	ReplayCounter uint64
+	KeyNonce      [32]uint8
+	KeyIV         [16]uint8
+	KeyRSC        uint64
+	KeyID         uint64
+	KeyMIC        [16]uint8
+	KeyDataLen    uint16
 }
 
 type EAPOLFrame struct {
-    EAPOLFrameHdr
-    KeyData []uint8
+	EAPOLFrameHdr
+	KeyData []uint8
 }
 
 func (frame *EAPOLFrame) UnmarshalBinary(r io.Reader) error {
-    err := binary.Read(r, binary.BigEndian, &frame.EAPOLFrameHdr)
-    if err != nil {
-        return err
-    }
+	err := binary.Read(r, binary.BigEndian, &frame.EAPOLFrameHdr)
+	if err != nil {
+		return err
+	}
 
-    frame.KeyData = make([]uint8, frame.KeyDataLen)
-    _, err = io.ReadFull(r, frame.KeyData)
+	frame.KeyData = make([]uint8, frame.KeyDataLen)
+	_, err = io.ReadFull(r, frame.KeyData)
 
-    return err
+	return err
 }
 
 func WPAPassphraseToPSK(ssid, passphrase string) []byte {
