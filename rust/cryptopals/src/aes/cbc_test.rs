@@ -5,8 +5,10 @@ use std::str;
 use aes::{AESCipher, AES_BLOCK_SIZE};
 use aes::cbc::AESCipherCBC;
 use pkcs7::{pkcs7_pad, pkcs7_maybe_unpad_copy};
-use ssv::{SSV_PREFIX, SSV_SUFFIX, ssv_aes_encrypt, ssv_aes_decrypt, has_admin};
+use ssv::{SSV_PREFIX, SSV_SUFFIX, ssv_aes_encrypt, ssv_aes_decrypt, has_admin,
+          ssv_aes_decrypt_and_check};
 use util::{rand_key, rand_bytes, EncryptOracle, DecryptOracle};
+use xor::slice_xor;
 
 // XXX: should be okay to be constant for this?
 const SSV_IV: [u8; 16] = [7u8; 16];
@@ -236,9 +238,39 @@ fn decrypt_aes_cbc_padding_test(plaintext: &[u8]) {
             "\nplaintext: {:?}\ndecrypted: {:?}", plaintext, decrypted);
 }
 
+fn key_as_iv_test() {
+    let key = rand_key();
+    println!("Running key_as_iv_test with key {:?}", key);
+
+    let cipher = AESCipherCBC::new(&key, &key);
+    let input = vec!('A' as u8; AES_BLOCK_SIZE * 2);
+    let mut ciphertext = ssv_aes_encrypt(&cipher, &input);
+    for b in ciphertext[AES_BLOCK_SIZE..AES_BLOCK_SIZE * 2].iter_mut() {
+        *b = 0;
+    }
+    for i in 0..AES_BLOCK_SIZE {
+        ciphertext[AES_BLOCK_SIZE * 2 + i] = ciphertext[i];
+    }
+    match ssv_aes_decrypt_and_check(&cipher, &ciphertext) {
+        Ok(v) => {
+            // XXX: no guarantee that we'll set high bits
+            // we could flip some bits and retry until we get a failure
+            panic!("key_as_iv_test failed, should retry? {:?}", &v)
+        },
+        Err(v) => {
+            let recovered =
+                slice_xor(&v[..AES_BLOCK_SIZE],
+                          &v[AES_BLOCK_SIZE * 2..AES_BLOCK_SIZE * 3]);
+            assert!(&key as &[u8] == &recovered as &[u8],
+                    "recovered {:?} expected the key", &recovered);
+        },
+    };
+}
+
 pub fn decrypt_aes_cbc_test() {
     println!("Starting AES CBC decrypt tests");
     decrypt_aes_cbc_ssv_bitflip_test();
+    key_as_iv_test();
     let plaintexts = [
         "1234567890123\x03\x036", // test disambiguating [1] vs [3, 3, 3]
         "\x16\x16\x16\x16\x16\x16\x16\x16\x16\x16\x16\x16\x16\x16\x16",

@@ -18,6 +18,25 @@ pub fn ssv_aes_decrypt(cipher: &AESCipher, ciphertext: &[u8]) -> Vec<u8> {
     cipher.decrypt_and_unpad(ciphertext)
 }
 
+/// Checks that output is ASCII otherwise returns error with plaintext
+pub fn ssv_aes_decrypt_and_check(cipher: &AESCipher,
+                                 ciphertext: &[u8]) -> Result<Vec<u8>,
+                                                              Vec<u8>> {
+    let result = ssv_aes_decrypt(cipher, ciphertext);
+    let mut not_ascii = false;
+    for b in &result {
+        if *b > 127u8 {
+            not_ascii = true;
+            break;
+        }
+    }
+    if not_ascii {
+        Err(result)
+    } else {
+        Ok(result)
+    }
+}
+
 // ssv: semicolon-separated values
 // XXX: should take a string but we may cause invalid utf8
 pub fn has_admin(buf: &[u8]) -> bool {
