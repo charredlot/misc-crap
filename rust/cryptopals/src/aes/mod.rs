@@ -1,5 +1,5 @@
 pub mod cbc;
-mod cbc_decrypt;
+mod cbc_test;
 mod constants;
 pub mod ctr;
 mod ctr_test;
@@ -7,7 +7,7 @@ mod detect;
 pub mod ecb;
 mod ecb_decrypt;
 use self::cbc::AESCipherCBC;
-use self::cbc_decrypt::decrypt_aes_cbc_test;
+use self::cbc_test::decrypt_aes_cbc_test;
 use self::constants::{SBOX,INV_SBOX,GF256_MUL_2, GF256_MUL_3, GF256_MUL_9,
                       GF256_MUL_11, GF256_MUL_13, GF256_MUL_14};
 use self::ctr_test::decrypt_aes_ctr_test;
