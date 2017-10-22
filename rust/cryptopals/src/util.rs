@@ -7,6 +7,11 @@ use self::rand::Rng;
 pub type EncryptOracle = Fn (&[u8]) -> Vec<u8>;
 pub type DecryptOracle = Fn (&[u8]) -> Vec<u8>;
 
+pub fn rand_bytes_range(begin: usize, end: usize) -> Vec<u8> {
+    let mut rng = rand::thread_rng();
+    rand_bytes(rng.gen_range(begin, end))
+}
+
 pub fn rand_bytes(len: usize) -> Vec<u8> {
     let mut rng = rand::thread_rng();
     let mut ret = Vec::new();
