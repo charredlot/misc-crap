@@ -86,7 +86,7 @@ impl Sha1 {
         self.blocks.input(data, |block| {
             *len += block.len() as u64;
             state.process(block);
-        })
+        });
     }
 
     /// Retrieve digest result.
