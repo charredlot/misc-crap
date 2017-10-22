@@ -194,6 +194,8 @@ pub fn mac_test(full_test: bool) {
 
     sha1_fixate_test();
     sha1_cat_mac_length_ext_test();
+    // XXX: skip md4 because too lazy to port rust versions and don't
+    // want to import the whole thing
     hmac_sha1_test();
     if full_test {
         hmac_sha1_timing_test();
