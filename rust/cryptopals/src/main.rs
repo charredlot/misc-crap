@@ -16,6 +16,6 @@ fn main() {
     mt19937_test();
     pkcs7_test();
     url_test();
-    mac_test();
+    mac_test(false);
     aes_test(false);
 }

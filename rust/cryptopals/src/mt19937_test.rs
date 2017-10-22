@@ -54,6 +54,7 @@ fn untemper_test(full: bool) {
         return;
     }
 
+    // num_threads has to be a factor of u32::max_value()
     let num_threads = 4;
     let mut threads = Vec::with_capacity(num_threads);
     let interval = u32::max_value() as usize / num_threads;
