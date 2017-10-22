@@ -24,7 +24,7 @@ pub const DIGEST_LENGTH: usize = 20;
 /// Represents a Sha1 hash object in memory.
 #[derive(Clone)]
 pub struct Sha1 {
-    state: Sha1State,
+    pub state: Sha1State,
     blocks: Blocks,
     len: u64,
 }
@@ -35,8 +35,8 @@ struct Blocks {
 }
 
 #[derive(Copy, Clone)]
-struct Sha1State {
-    state: [u32; 5],
+pub struct Sha1State {
+    pub state: [u32; 5],
 }
 
 /// Digest generated from a `Sha1` instance.
@@ -44,7 +44,7 @@ struct Sha1State {
 /// A digest can be formatted to view the digest as a hex string, or the bytes
 /// can be extracted for later processing.
 pub struct Digest {
-    data: Sha1State,
+    pub data: Sha1State,
 }
 
 const DEFAULT_STATE: Sha1State =
@@ -64,6 +64,17 @@ impl Sha1 {
     pub fn new() -> Sha1 {
         Sha1 {
             state: DEFAULT_STATE,
+            len: 0,
+            blocks: Blocks {
+                len: 0,
+                block: [0; 64],
+            },
+        }
+    }
+
+    pub fn new_with_digest(digest: &Digest) -> Sha1 {
+        Sha1 {
+            state: digest.data,
             len: 0,
             blocks: Blocks {
                 len: 0,
