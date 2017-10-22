@@ -44,3 +44,11 @@ pub fn unix_timestamp_sec() -> i64{
         Err(_) => 0 as i64, // can't handle negative times for now :/
     }
 }
+
+pub fn assert_slice_cmp(label: &'static str, expected: &[u8], got: &[u8]) {
+    assert!(expected == got,
+            concat!("\n{}\n",
+                    "expected {:?}\n",
+                    "     got {:?}\n"),
+            label, expected, got);
+}
