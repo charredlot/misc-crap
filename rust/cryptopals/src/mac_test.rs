@@ -17,16 +17,15 @@ fn sha1_fixate_test() {
         tmp.digest()
     };
 
-    println!("boop mac {:?}", &expected.data.state);
-
     let mut mod_mac = {
         let mut tmp = Sha1::new();
         tmp.update(msgs[0].as_bytes());
         Sha1::new_with_digest(&tmp.digest())
     };
     mod_mac.update(&sha1_pad(&padded)[save_len..]);
-    println!("boop mod mac {:?}", &mod_mac.state.state);
-    println!("boop {}", expected.data.state == mod_mac.state.state);
+    assert!(expected.data.state == mod_mac.state.state,
+            "sha1_fixate_test failed expected {:?} got {:?}",
+            expected.data.state, mod_mac.state.state);
 }
 
 fn sha1_cat_mac_length_ext_test() {
