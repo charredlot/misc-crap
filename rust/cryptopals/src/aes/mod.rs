@@ -23,7 +23,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::str;
 
-const AES_BLOCK_SIZE: usize = 16;
+pub const AES_BLOCK_SIZE: usize = 16;
 
 pub trait AESCipher {
     fn set_iv(&mut self, _iv: &[u8]) { panic!("set_iv not implemented "); }

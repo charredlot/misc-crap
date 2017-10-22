@@ -1,4 +1,5 @@
 use aes::{AESCipher, expand_key, encrypt_block, decrypt_block, AES_BLOCK_SIZE};
+use util::rand_bytes;
 use xor::fixed_xor;
 
 pub struct AESCipherCBC {
@@ -12,6 +13,15 @@ impl AESCipherCBC {
             key_schedule: expand_key(key),
             iv: iv.to_vec(),
         }
+    }
+
+    pub fn new_rand_iv(key: &[u8]) -> (AESCipherCBC, Vec<u8>) {
+        let iv = rand_bytes(AES_BLOCK_SIZE);
+        (AESCipherCBC {
+            key_schedule: expand_key(key),
+            iv: iv.clone(),
+         },
+         iv)
     }
 
     pub fn encrypt_iv(&self, init_iv: &[u8], plaintext: &[u8]) -> Vec<u8> {

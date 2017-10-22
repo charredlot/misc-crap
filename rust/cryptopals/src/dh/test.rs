@@ -1,7 +1,12 @@
 extern crate gmp;
 
+use std::sync::mpsc::{channel, Sender, Receiver};
+use std::thread;
+
 use self::gmp::mpz::Mpz;
-use dh::{ff_dhe_public, ff_dhe_shared};
+use aes::AESCipher;
+use aes::cbc::AESCipherCBC;
+use dh::{ff_dhe_public, ff_dhe_shared, ff_dhe_shared_aes_key};
 
 fn ff_dhe_test() {
     let test_vectors = [
@@ -38,9 +43,124 @@ fn ff_dhe_test() {
     }
 }
 
+#[derive(Debug)]
+enum SimMsg {
+    Exchange(Mpz),
+    Encrypted(Vec<u8>),
+    Plain(Vec<u8>),
+}
+
+impl SimMsg {
+    fn expect_exchange(self) -> Mpz {
+        match self {
+            SimMsg::Exchange(n) => n,
+            _ => panic!("SimMsg expected exchange got {:?}", self),
+        }
+    }
+
+    fn expect_encrypted(self) -> Vec<u8> {
+        match self {
+            SimMsg::Encrypted(msg) => msg,
+            _ => panic!("SimMsg expected encrypted got {:?}", self),
+        }
+    }
+
+    // could macro this ?
+    fn expect_plain(self) -> Vec<u8> {
+        match self {
+            SimMsg::Plain(msg) => msg,
+            _ => panic!("SimMsg expected plain got {:?}", self),
+        }
+    }
+}
+
+fn dhe_sim_send(tx: &Sender<SimMsg>, key: &[u8], plaintext: &[u8]) {
+    let (cipher, iv) = AESCipherCBC::new_rand_iv(key);
+    let ciphertext = cipher.pad_and_encrypt(plaintext);
+    tx.send(SimMsg::Encrypted(ciphertext)).unwrap();
+    tx.send(SimMsg::Plain(iv.clone())).unwrap();
+}
+
+fn dhe_sim_recv(rx: &Receiver<SimMsg>, key: &[u8]) -> Vec<u8> {
+    let ciphertext = rx.recv().unwrap().expect_encrypted();
+    let iv = rx.recv().unwrap().expect_plain();
+
+    let cipher = AESCipherCBC::new(&key, &iv);
+    cipher.decrypt_and_unpad(&ciphertext)
+}
+
+fn dhe_sim_a(tx: Sender<SimMsg>, rx: Receiver<SimMsg>) {
+    // XXX: should probably randomize these or something
+    let priv_a = Mpz::from_str_radix("53", 16).unwrap();
+    let g = Mpz::from_str_radix("2", 16).unwrap();
+    let p = Mpz::from_str_radix("71", 16).unwrap();
+
+    // 1. send DHE params including public
+    let pub_a = ff_dhe_public(&priv_a, &g, &p);
+    tx.send(SimMsg::Exchange(g.clone())).unwrap();
+    tx.send(SimMsg::Exchange(p.clone())).unwrap();
+    tx.send(SimMsg::Exchange(pub_a.clone())).unwrap();
+
+    // 2. get B's public and generate shared key
+    let pub_b = rx.recv().unwrap().expect_exchange();
+
+    let key = ff_dhe_shared_aes_key(&priv_a, &pub_b, &p);
+
+    // 3. encrypt and send message
+    dhe_sim_send(&tx, &key, DHE_SIM_MSG.as_bytes());
+
+    // 4. receive echo'd message
+    let plaintext = dhe_sim_recv(&rx, &key);
+    assert!(&plaintext as &[u8] == DHE_SIM_MSG.as_bytes());
+}
+
+fn dhe_sim_b(tx: Sender<SimMsg>, rx: Receiver<SimMsg>) {
+    // 1. recv DHE params
+    let g = rx.recv().unwrap().expect_exchange();
+    let p = rx.recv().unwrap().expect_exchange();
+    let pub_a = rx.recv().unwrap().expect_exchange();
+
+    // 2. generate private and public param and send public
+    // XXX: should make a rand byte thing
+    let priv_b = Mpz::from_str_radix("32", 16).unwrap();
+    assert!(priv_b < p);
+
+    let pub_b = ff_dhe_public(&priv_b, &g, &p);
+    tx.send(SimMsg::Exchange(pub_b)).unwrap();
+
+    // 3. derive shared key
+    let key = ff_dhe_shared_aes_key(&priv_b, &pub_a, &p);
+
+    // 4. receive and decrypt message
+    let plaintext = dhe_sim_recv(&rx, &key);
+    assert!(&plaintext as &[u8] == DHE_SIM_MSG.as_bytes());
+
+    // 5. encrypt and send back message
+    dhe_sim_send(&tx, &key, &plaintext);
+}
+
+const DHE_SIM_MSG: &'static str = "beep boop meow";
+fn dhe_mitm_test() {
+    let (a_tx, b_rx) = channel();
+    let (b_tx, a_rx) = channel();
+    let thread_a = thread::spawn(move || {
+            dhe_sim_a(a_tx, a_rx);
+        }
+    );
+    let thread_b = thread::spawn(move || {
+            dhe_sim_b(b_tx, b_rx);
+        }
+    );
+
+    thread_a.join().unwrap();
+    thread_b.join().unwrap();
+}
+
 pub fn dh_test() {
     let n = Mpz::new();
     println!("rust-gmp big zero {:?}", n);
 
     ff_dhe_test();
+    dhe_mitm_test();
+    panic!("boop");
 }

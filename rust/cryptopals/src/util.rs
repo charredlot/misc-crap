@@ -1,8 +1,11 @@
+extern crate gmp;
 extern crate rand;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use self::gmp::mpz::Mpz;
 use self::rand::Rng;
+use hex::hex_to_bytes;
 
 pub type EncryptOracle = Fn (&[u8]) -> Vec<u8>;
 pub type DecryptOracle = Fn (&[u8]) -> Vec<u8>;
@@ -51,4 +54,8 @@ pub fn assert_slice_cmp(label: &'static str, expected: &[u8], got: &[u8]) {
                     "expected {:?}\n",
                     "     got {:?}\n"),
             label, expected, got);
+}
+
+pub fn mpz_bytes(mpz: &Mpz) -> Vec<u8> {
+    hex_to_bytes(&mpz.to_str_radix(16))
 }
