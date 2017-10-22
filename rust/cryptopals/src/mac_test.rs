@@ -1,7 +1,8 @@
+use hex::hex_to_bytes;
 use mac::{sha1_cat_mac, sha1_cat_mac_digest, sha1_pad, sha1_pad_extend,
-          sha1_cat_mac_verify};
+          sha1_cat_mac_verify, hmac_sha1};
 use sha1::{Sha1, Digest};
-use util::rand_bytes_range;
+use util::{rand_bytes_range, assert_slice_cmp};
 
 fn sha1_fixate_test() {
     let msgs = [
@@ -72,6 +73,23 @@ fn sha1_cat_mac_length_ext_test() {
     panic!("could not find a matching key_len");
 }
 
+fn hmac_sha1_test() {
+    const TEST_VECTORS: [(&'static str, &'static str, &'static str); 2] = [
+        ("",
+         "",
+         "fbdb1d1b18aa6c08324b7d64b71fb76370690e1d"),
+        ("key",
+         "The quick brown fox jumps over the lazy dog",
+         "de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9"),
+    ];
+
+    for &(key, msg, hmac_str) in &TEST_VECTORS {
+        assert_slice_cmp("hmac_sha1_test vectors",
+                         &hex_to_bytes(hmac_str),
+                         &hmac_sha1(key.as_bytes(), msg.as_bytes()));
+    }
+}
+
 pub fn mac_test() {
     println!("sha1_cat_mac {:?}", &sha1_cat_mac("abcd".as_bytes(),
                                                 "efgh".as_bytes()));
@@ -80,5 +98,6 @@ pub fn mac_test() {
 
     sha1_fixate_test();
     sha1_cat_mac_length_ext_test();
+    hmac_sha1_test();
     println!("Finished MAC tests");
 }
