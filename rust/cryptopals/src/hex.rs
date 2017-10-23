@@ -37,9 +37,15 @@ fn byte_to_nibble(c: u8) -> u8 {
 
 pub fn hex_to_bytes(s: &str) -> Vec<u8> {
     // XXX: return reasonable errors
-    assert!(s.len() % 2 == 0, "hex string length should be an even number");
-    let mut vec = Vec::with_capacity(s.len() / 2);
-    for pair in s.as_bytes().chunks(2) {
+    let mut vec = Vec::with_capacity((s.len() + 1) / 2);
+    let mut slice = s.as_bytes();
+
+    if s.len() % 2 != 0 {
+        vec.push(byte_to_nibble(slice[0]));
+        slice = &slice[1..]
+    };
+
+    for pair in slice.chunks(2) {
         // XXX: return errors
         vec.push((byte_to_nibble(pair[0]) << 4) + byte_to_nibble(pair[1]));
     }
