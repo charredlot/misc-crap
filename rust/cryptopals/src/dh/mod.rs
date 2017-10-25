@@ -19,10 +19,8 @@ pub fn ff_dhe_shared(private: &Mpz, peer_public: &Mpz, prime: &Mpz) -> Mpz {
 }
 
 // aes128
-pub fn ff_dhe_shared_aes_key(private: &Mpz,
-                             peer_public: &Mpz,
-                             prime: &Mpz) -> Vec<u8> {
-    let mut key = mpz_bytes(&ff_dhe_shared(private, peer_public, prime));
+pub fn ff_dhe_aes_key_adjust(raw_key: &Mpz) -> Vec<u8> {
+    let mut key = mpz_bytes(raw_key);
     if key.len() <= AES_BLOCK_SIZE {
         // probably bad but just zeropad
         for _ in key.len()..AES_BLOCK_SIZE {
@@ -32,4 +30,10 @@ pub fn ff_dhe_shared_aes_key(private: &Mpz,
     } else {
         (&key[..AES_BLOCK_SIZE]).to_vec()
     }
+}
+
+pub fn ff_dhe_shared_aes_key(private: &Mpz,
+                             peer_public: &Mpz,
+                             prime: &Mpz) -> Vec<u8> {
+    ff_dhe_aes_key_adjust(&ff_dhe_shared(private, peer_public, prime))
 }
