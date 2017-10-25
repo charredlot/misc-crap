@@ -8,6 +8,48 @@ use aes::AESCipher;
 use aes::cbc::AESCipherCBC;
 use dh::{ff_dhe_public, ff_dhe_shared, ff_dhe_shared_aes_key};
 
+type DHEPeer = fn (Sender<SimMsg>, Receiver<SimMsg>);
+type DHEMitm = fn (Sender<SimMsg>, Receiver<SimMsg>,
+                   Sender<SimMsg>, Receiver<SimMsg>,
+                   mitm_type: MITMType);
+
+#[derive(Debug)]
+enum SimMsg {
+    Exchange(Mpz),
+    Encrypted(Vec<u8>),
+    Plain(Vec<u8>),
+}
+
+impl SimMsg {
+    fn expect_exchange(self) -> Mpz {
+        match self {
+            SimMsg::Exchange(n) => n,
+            _ => panic!("SimMsg expected exchange got {:?}", self),
+        }
+    }
+
+    fn expect_encrypted(self) -> Vec<u8> {
+        match self {
+            SimMsg::Encrypted(msg) => msg,
+            _ => panic!("SimMsg expected encrypted got {:?}", self),
+        }
+    }
+
+    // could macro this ?
+    fn expect_plain(self) -> Vec<u8> {
+        match self {
+            SimMsg::Plain(msg) => msg,
+            _ => panic!("SimMsg expected plain got {:?}", self),
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum MITMType{
+    Passthrough,
+    ReplacePubs,
+}
+
 fn ff_dhe_test() {
     let test_vectors = [
         // hex values
@@ -43,37 +85,6 @@ fn ff_dhe_test() {
     }
 }
 
-#[derive(Debug)]
-enum SimMsg {
-    Exchange(Mpz),
-    Encrypted(Vec<u8>),
-    Plain(Vec<u8>),
-}
-
-impl SimMsg {
-    fn expect_exchange(self) -> Mpz {
-        match self {
-            SimMsg::Exchange(n) => n,
-            _ => panic!("SimMsg expected exchange got {:?}", self),
-        }
-    }
-
-    fn expect_encrypted(self) -> Vec<u8> {
-        match self {
-            SimMsg::Encrypted(msg) => msg,
-            _ => panic!("SimMsg expected encrypted got {:?}", self),
-        }
-    }
-
-    // could macro this ?
-    fn expect_plain(self) -> Vec<u8> {
-        match self {
-            SimMsg::Plain(msg) => msg,
-            _ => panic!("SimMsg expected plain got {:?}", self),
-        }
-    }
-}
-
 fn dhe_sim_send(tx: &Sender<SimMsg>, key: &[u8], plaintext: &[u8]) {
     let (cipher, iv) = AESCipherCBC::new_rand_iv(key);
     let ciphertext = cipher.pad_and_encrypt(plaintext);
@@ -81,22 +92,15 @@ fn dhe_sim_send(tx: &Sender<SimMsg>, key: &[u8], plaintext: &[u8]) {
     tx.send(SimMsg::Plain(iv.clone())).unwrap();
 }
 
-fn dhe_sim_recv(rx: &Receiver<SimMsg>, key: &[u8], mitm: bool) -> Vec<u8> {
+fn dhe_sim_recv(rx: &Receiver<SimMsg>, key: &[u8]) -> Vec<u8> {
     let ciphertext = rx.recv().unwrap().expect_encrypted();
     let iv = rx.recv().unwrap().expect_plain();
-
-    if mitm {
-        // if we swap p for B then we get (p ^ a) % p which is always 0
-        let cipher = AESCipherCBC::new(&[0u8; 16], &iv);
-        let plaintext = cipher.decrypt_and_unpad(&ciphertext);
-        assert!(&plaintext as &[u8] == DHE_SIM_MSG.as_bytes());
-    }
 
     let cipher = AESCipherCBC::new(&key, &iv);
     cipher.decrypt_and_unpad(&ciphertext)
 }
 
-fn dhe_sim_a(tx: Sender<SimMsg>, rx: Receiver<SimMsg>, mitm: bool) {
+fn dhe_sim_a(tx: Sender<SimMsg>, rx: Receiver<SimMsg>) {
     // XXX: should probably randomize these or something
     let priv_a = Mpz::from_str_radix("53", 16).unwrap();
     let g = Mpz::from_str_radix("2", 16).unwrap();
@@ -106,11 +110,7 @@ fn dhe_sim_a(tx: Sender<SimMsg>, rx: Receiver<SimMsg>, mitm: bool) {
     let pub_a = ff_dhe_public(&priv_a, &g, &p);
     tx.send(SimMsg::Exchange(g.clone())).unwrap();
     tx.send(SimMsg::Exchange(p.clone())).unwrap();
-    if mitm {
-        tx.send(SimMsg::Exchange(p.clone())).unwrap();
-    } else {
-        tx.send(SimMsg::Exchange(pub_a)).unwrap();
-    }
+    tx.send(SimMsg::Exchange(pub_a.clone())).unwrap();
 
     // 2. get B's public and generate shared key
     let pub_b = rx.recv().unwrap().expect_exchange();
@@ -121,11 +121,11 @@ fn dhe_sim_a(tx: Sender<SimMsg>, rx: Receiver<SimMsg>, mitm: bool) {
     dhe_sim_send(&tx, &key, DHE_SIM_MSG.as_bytes());
 
     // 4. receive echo'd message
-    let plaintext = dhe_sim_recv(&rx, &key, mitm);
+    let plaintext = dhe_sim_recv(&rx, &key);
     assert!(&plaintext as &[u8] == DHE_SIM_MSG.as_bytes());
 }
 
-fn dhe_sim_b(tx: Sender<SimMsg>, rx: Receiver<SimMsg>, mitm: bool) {
+fn dhe_sim_b(tx: Sender<SimMsg>, rx: Receiver<SimMsg>) {
     // 1. recv DHE params
     let g = rx.recv().unwrap().expect_exchange();
     let p = rx.recv().unwrap().expect_exchange();
@@ -137,38 +137,95 @@ fn dhe_sim_b(tx: Sender<SimMsg>, rx: Receiver<SimMsg>, mitm: bool) {
     assert!(priv_b < p);
 
     let pub_b = ff_dhe_public(&priv_b, &g, &p);
-    if mitm {
-        tx.send(SimMsg::Exchange(p.clone())).unwrap();
-    } else {
-        tx.send(SimMsg::Exchange(pub_b)).unwrap();
-    }
+    tx.send(SimMsg::Exchange(pub_b)).unwrap();
 
     // 3. derive shared key
     let key = ff_dhe_shared_aes_key(&priv_b, &pub_a, &p);
 
     // 4. receive and decrypt message
-    let plaintext = dhe_sim_recv(&rx, &key, mitm);
+    let plaintext = dhe_sim_recv(&rx, &key);
     assert!(&plaintext as &[u8] == DHE_SIM_MSG.as_bytes());
 
     // 5. encrypt and send back message
     dhe_sim_send(&tx, &key, &plaintext);
 }
 
+fn dhe_sim_mitm(a_tx: Sender<SimMsg>, a_rx: Receiver<SimMsg>,
+                b_tx: Sender<SimMsg>, b_rx: Receiver<SimMsg>,
+                mitm_type: MITMType) {
+    let g = a_rx.recv().unwrap().expect_exchange();
+    let p = a_rx.recv().unwrap().expect_exchange();
+    let pub_a = a_rx.recv().unwrap().expect_exchange();
+
+    // pass initial params to b
+    b_tx.send(SimMsg::Exchange(g.clone())).unwrap();
+    b_tx.send(SimMsg::Exchange(p.clone())).unwrap();
+    if mitm_type == MITMType::ReplacePubs {
+        b_tx.send(SimMsg::Exchange(p.clone())).unwrap();
+    } else {
+        b_tx.send(SimMsg::Exchange(pub_a.clone())).unwrap();
+    }
+
+    // pass pub_b to a
+    let pub_b = b_rx.recv().unwrap().expect_exchange();
+    if mitm_type == MITMType::ReplacePubs {
+        a_tx.send(SimMsg::Exchange(p.clone())).unwrap();
+    } else {
+        a_tx.send(SimMsg::Exchange(pub_b.clone())).unwrap();
+    }
+
+    fn decrypt(ciphertext: &[u8], iv: &[u8]) {
+        // if we swap p for B then we get (p ^ a) % p which is always 0
+        let cipher = AESCipherCBC::new(&[0u8; 16], &iv);
+        let plaintext = cipher.decrypt_and_unpad(&ciphertext);
+        assert!(&plaintext as &[u8] == DHE_SIM_MSG.as_bytes());
+    }
+
+    {
+        // proxy msg from a to b
+        let ciphertext = a_rx.recv().unwrap().expect_encrypted();
+        let iv = a_rx.recv().unwrap().expect_plain();
+        if mitm_type == MITMType::ReplacePubs {
+            decrypt(&ciphertext, &iv);
+        }
+        b_tx.send(SimMsg::Encrypted(ciphertext)).unwrap();
+        b_tx.send(SimMsg::Plain(iv)).unwrap();
+    }
+    {
+        // proxy msg from b to a
+        let ciphertext = b_rx.recv().unwrap().expect_encrypted();
+        let iv = b_rx.recv().unwrap().expect_plain();
+        if mitm_type == MITMType::ReplacePubs {
+            decrypt(&ciphertext, &iv);
+        }
+        a_tx.send(SimMsg::Encrypted(ciphertext)).unwrap();
+        a_tx.send(SimMsg::Plain(iv)).unwrap();
+    }
+}
+
 const DHE_SIM_MSG: &'static str = "beep boop meow";
-fn dhe_mitm_test(mitm: bool) {
-    let (a_tx, b_rx) = channel();
-    let (b_tx, a_rx) = channel();
+fn dhe_mitm_test(func_a: DHEPeer, func_b: DHEPeer, func_m: DHEMitm,
+                 mitm_type: MITMType) {
+    let (a_tx, ma_rx) = channel();
+    let (ma_tx, a_rx) = channel();
+    let (b_tx, mb_rx) = channel();
+    let (mb_tx, b_rx) = channel();
     let thread_a = thread::spawn(move || {
-            dhe_sim_a(a_tx, a_rx, mitm);
+            func_a(a_tx, a_rx);
         }
     );
     let thread_b = thread::spawn(move || {
-            dhe_sim_b(b_tx, b_rx, mitm);
+            func_b(b_tx, b_rx);
+        }
+    );
+    let thread_m = thread::spawn(move || {
+            func_m(ma_tx, ma_rx, mb_tx, mb_rx, mitm_type);
         }
     );
 
     thread_a.join().unwrap();
     thread_b.join().unwrap();
+    thread_m.join().unwrap();
 }
 
 pub fn dh_test() {
@@ -176,6 +233,9 @@ pub fn dh_test() {
     println!("rust-gmp big zero {:?}", n);
 
     ff_dhe_test();
-    dhe_mitm_test(true);
-    dhe_mitm_test(false);
+
+    // XXX: figure out closures into threads one day...maybe when
+    // FnBox or Box<FnOnce> works?
+    dhe_mitm_test(dhe_sim_a, dhe_sim_b, dhe_sim_mitm, MITMType::Passthrough);
+    dhe_mitm_test(dhe_sim_a, dhe_sim_b, dhe_sim_mitm, MITMType::ReplacePubs);
 }
