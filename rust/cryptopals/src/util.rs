@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use self::gmp::mpz::Mpz;
 use self::rand::Rng;
-use hex::hex_to_bytes;
+use hex::{hex_to_bytes, bytes_to_hex};
 
 pub type EncryptOracle = Fn (&[u8]) -> Vec<u8>;
 pub type DecryptOracle = Fn (&[u8]) -> Vec<u8>;
@@ -58,4 +58,15 @@ pub fn assert_slice_cmp(label: &'static str, expected: &[u8], got: &[u8]) {
 
 pub fn mpz_bytes(mpz: &Mpz) -> Vec<u8> {
     hex_to_bytes(&mpz.to_str_radix(16))
+}
+
+pub fn bytes_to_mpz(bytes: &[u8]) -> Mpz {
+    Mpz::from_str_radix(&bytes_to_hex(bytes), 16).unwrap()
+}
+
+// random-ish num less than the max
+pub fn randomish_mpz_lt(max: &Mpz) -> Mpz {
+    // TODO: ehhhhh this is a kludge, just make sure it's less than max
+    let len = (max.bit_length() / 8) - 1;
+    bytes_to_mpz(&rand_bytes(len))
 }
