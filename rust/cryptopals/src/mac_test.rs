@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use hex::hex_to_bytes;
 use mac::{sha1_cat_mac, sha1_cat_mac_digest, sha1_pad, sha1_pad_extend,
-          sha1_cat_mac_verify, hmac_sha1};
+          sha1_cat_mac_verify, hmac_sha1, hmac_sha256};
 use sha1::{Sha1, Digest, DIGEST_LENGTH};
 use util::{rand_bytes_range, assert_slice_cmp};
 
@@ -77,20 +77,24 @@ fn sha1_cat_mac_length_ext_test() {
     panic!("could not find a matching key_len");
 }
 
-fn hmac_sha1_test() {
-    const TEST_VECTORS: [(&'static str, &'static str, &'static str); 2] = [
+fn hmac_sha_test() {
+    const TEST_VECTORS: [(&'static str, &'static str,
+                          &'static str, &'static str); 2] = [
         ("",
          "",
-         "fbdb1d1b18aa6c08324b7d64b71fb76370690e1d"),
+         "fbdb1d1b18aa6c08324b7d64b71fb76370690e1d",
+         "b613679a0814d9ec772f95d778c35fc5ff1697c493715653c6c712144292c5ad"),
         ("key",
          "The quick brown fox jumps over the lazy dog",
-         "de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9"),
+         "de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9",
+         "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"),
     ];
 
-    for &(key, msg, hmac_str) in &TEST_VECTORS {
-        assert_slice_cmp("hmac_sha1_test vectors",
-                         &hex_to_bytes(hmac_str),
-                         &hmac_sha1(key.as_bytes(), msg.as_bytes()));
+    for &(key, msg, sha1_str, sha256_str) in &TEST_VECTORS {
+        assert_eq!(&hex_to_bytes(sha1_str),
+                   &hmac_sha1(key.as_bytes(), msg.as_bytes()));
+        assert_eq!(&hex_to_bytes(sha256_str),
+                   &hmac_sha256(key.as_bytes(), msg.as_bytes()));
     }
 }
 
@@ -196,7 +200,7 @@ pub fn mac_test(full_test: bool) {
     sha1_cat_mac_length_ext_test();
     // XXX: skip md4 because too lazy to port rust versions and don't
     // want to import the whole thing
-    hmac_sha1_test();
+    hmac_sha_test();
     if full_test {
         hmac_sha1_timing_test();
     }
