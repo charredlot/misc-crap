@@ -10,6 +10,7 @@ pub mod mt19937;
 pub mod mt19937_test;
 pub mod pkcs7;
 pub mod sha1;
+pub mod srp;
 pub mod ssv;
 pub mod url;
 pub mod util;

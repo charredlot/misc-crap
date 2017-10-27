@@ -7,10 +7,12 @@ use cryptopals::dh::test::dh_test;
 use cryptopals::mac_test::mac_test;
 use cryptopals::mt19937_test::mt19937_test;
 use cryptopals::pkcs7::pkcs7_test;
+use cryptopals::srp::test::srp_test;
 use cryptopals::url::url_test;
 use cryptopals::xor::xor_test;
 
 fn main() {
+    srp_test();
     dh_test();
     base64_test();
     xor_test();
