@@ -139,6 +139,118 @@ fn srp_exchange_test(client: fn (Sender<SRPMsg>, Receiver<SRPMsg>,
     server_thread.join().unwrap();
 }
 
+fn srp_simplified_client(tx: Sender<SRPMsg>, rx: Receiver<SRPMsg>) {
+    let n = Mpz::from_str_radix(SRP_N, 16).unwrap();
+    let g = Mpz::from_str_radix("2", 10).unwrap();
+
+    tx.send(SRPMsg::Num(n.clone())).unwrap();
+    tx.send(SRPMsg::Num(g.clone())).unwrap();
+
+    let priv_a = randomish_mpz_lt(&n);
+    println!("SRP simplified client private a {:?}", &priv_a);
+    let pub_a = g.powm(&priv_a, &n);
+
+    tx.send(SRPMsg::Bytes(TEST_IDENTITY.as_bytes().to_vec())).unwrap();
+    tx.send(SRPMsg::Num(pub_a.clone())).unwrap();
+
+    let salt = rx.recv().unwrap().expect_bytes();
+    let pub_b = rx.recv().unwrap().expect_num();
+    let u = rx.recv().unwrap().expect_num();
+
+    let x = bytes_to_mpz(&srp::salted_hash(&salt, TEST_IDENTITY.as_bytes(),
+                                           TEST_PASSWORD.as_bytes()));
+    let s = pub_b.powm(&(priv_a + (u * x)), &n);
+    let k = Sha256::digest(&mpz_bytes(&s)).to_vec();
+
+    let hmac = hmac_sha256(&k, &salt);
+    tx.send(SRPMsg::Bytes(hmac)).unwrap();
+}
+
+fn srp_simplified_server(tx: Sender<SRPMsg>, rx: Receiver<SRPMsg>,
+                         brute_force: bool) {
+    let n = rx.recv().unwrap().expect_num();
+    let g = rx.recv().unwrap().expect_num();
+
+    let identity = rx.recv().unwrap().expect_bytes();
+    let pub_a = rx.recv().unwrap().expect_num();
+
+    // salt should be random, but we're changing it anyways
+    let salt = [0u8; 1];
+    let priv_b = randomish_mpz_lt(&n);
+    println!("SRP simplified server private b {:?}", &priv_b);
+    let pub_b = g.powm(&priv_b, &n);
+    // u should be random 128-bit, but we're changing it anyways
+    let u = Mpz::one();
+
+    tx.send(SRPMsg::Bytes(salt.to_vec())).unwrap();
+    if brute_force {
+        // client calculates S = B ^ (a + (u * x)) mod n
+        // u is 1, so we have S = (B ^ a) * (B ^ x) mod n
+        // if we set B == g, then
+        // S = (g ^ a) * (g ^ x) = A * (g ^ x) mod n
+        // so we can brute force to get the right S since client gives us A
+        tx.send(SRPMsg::Num(g.clone())).unwrap();
+    } else {
+        tx.send(SRPMsg::Num(pub_b.clone())).unwrap();
+    }
+    tx.send(SRPMsg::Num(u.clone())).unwrap();
+
+    if brute_force {
+        // pretending like we don't know password
+        // sending g gives us:
+        // x = SHA256(salt||identity||password)
+        // S = A * (g ^ x) % n
+        // K = SHA256(S)
+        // compare against hmac_sha256(k, salt)
+        let client_hmac = rx.recv().unwrap().expect_bytes();
+
+        // XXX: should brute force dictionary offline and make a map but
+        // too much trouble
+        let words = [
+            "i", "wanna", "be", "where", "the", "people", "are",
+            TEST_PASSWORD,
+        ];
+        for word in &words {
+            let x = bytes_to_mpz(&srp::salted_hash(&salt,
+                                                   TEST_IDENTITY.as_bytes(),
+                                                   word.as_bytes()));
+            let s = (&pub_a * g.powm(&x, &n)).modulus(&n);
+            let k = Sha256::digest(&mpz_bytes(&s)).to_vec();
+            let hmac = hmac_sha256(&k, &salt);
+            if hmac == client_hmac {
+                return;
+            }
+        }
+        assert!(false, "SRP simplified brute force failed")
+    } else {
+        let x = bytes_to_mpz(&srp::salted_hash(&salt, &identity,
+                                               TEST_PASSWORD.as_bytes()));
+        let v = g.powm(&x, &n);
+        let s = (pub_a * v.powm(&u, &n)).powm(&priv_b, &n);
+        let k = Sha256::digest(&mpz_bytes(&s)).to_vec();
+
+        let hmac = hmac_sha256(&k, &salt);
+        let client_hmac = rx.recv().unwrap().expect_bytes();
+
+        assert_eq!(hmac, client_hmac, "SRP simplified hmac compare failed");
+    }
+}
+
+fn srp_simplified_test(client: fn (Sender<SRPMsg>, Receiver<SRPMsg>),
+                       server: fn (Sender<SRPMsg>, Receiver<SRPMsg>, bool),
+                       brute_force: bool) {
+    let (c_tx, s_rx) = channel();
+    let (s_tx, c_rx) = channel();
+
+    let client_thread = thread::spawn(move || { client(c_tx, c_rx); });
+    let server_thread = thread::spawn(move || {
+        server(s_tx, s_rx, brute_force);
+    });
+
+    client_thread.join().unwrap();
+    server_thread.join().unwrap();
+}
+
 pub fn srp_test() {
     println!("Starting SRP tests");
     srp_exchange_test(srp_client, srp_server, None);
@@ -147,5 +259,8 @@ pub fn srp_test() {
     let n = Mpz::from_str_radix(SRP_N, 16).unwrap();
     srp_exchange_test(srp_client, srp_server, Some(n.clone()));
     srp_exchange_test(srp_client, srp_server, Some(&n * &n));
+
+    srp_simplified_test(srp_simplified_client, srp_simplified_server, false);
+    srp_simplified_test(srp_simplified_client, srp_simplified_server, true);
     println!("Finished SRP tests");
 }
