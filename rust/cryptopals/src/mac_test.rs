@@ -92,9 +92,11 @@ fn hmac_sha_test() {
 
     for &(key, msg, sha1_str, sha256_str) in &TEST_VECTORS {
         assert_eq!(&hex_to_bytes(sha1_str),
-                   &hmac_sha1(key.as_bytes(), msg.as_bytes()));
+                   &hmac_sha1(key.as_bytes(), msg.as_bytes()),
+                   "hmac_sha1 test vector failed");
         assert_eq!(&hex_to_bytes(sha256_str),
-                   &hmac_sha256(key.as_bytes(), msg.as_bytes()));
+                   &hmac_sha256(key.as_bytes(), msg.as_bytes()),
+                   "hmac_sha256 test vector failed");
     }
 }
 
