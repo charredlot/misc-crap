@@ -70,3 +70,10 @@ pub fn randomish_mpz_lt(max: &Mpz) -> Mpz {
     let len = (max.bit_length() / 8) - 1;
     bytes_to_mpz(&rand_bytes(len))
 }
+
+pub fn randomish_prime(bit_len: usize) -> Mpz {
+    // TODO: eh round to byte len maybe fix later
+    let len = bit_len / 8;
+    let num = bytes_to_mpz(&rand_bytes(len));
+    num.nextprime()
+}
