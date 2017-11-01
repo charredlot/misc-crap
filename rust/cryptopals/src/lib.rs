@@ -9,6 +9,7 @@ pub mod mac_test;
 pub mod mt19937;
 pub mod mt19937_test;
 pub mod pkcs7;
+pub mod rsa;
 pub mod sha1;
 pub mod srp;
 pub mod ssv;
