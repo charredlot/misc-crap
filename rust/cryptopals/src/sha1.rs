@@ -59,6 +59,12 @@ fn as_block(input: &[u8]) -> &[u8; 64] {
     }
 }
 
+pub fn digest(msg: &[u8]) -> [u8; DIGEST_LENGTH] {
+    let mut hash = Sha1::new();
+    hash.update(&msg);
+    hash.digest().bytes()
+}
+
 impl Sha1 {
     /// Creates an fresh sha1 hash object.
     pub fn new() -> Sha1 {
