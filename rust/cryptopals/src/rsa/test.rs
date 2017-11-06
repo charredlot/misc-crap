@@ -101,10 +101,19 @@ fn unpadded_msg_test() {
     assert_eq!(recovered, plaintext, "rsa unpadded_msg_test failed");
 }
 
+fn pkcs1v15_test() {
+    let (pub_key, priv_key) = new_keypair(512);
+    println!("pkcs1v15_test {:?} {:?}", &pub_key, &priv_key);
+    let msg = "beep boop meow";
+    let signature = priv_key.pkcs1v15_sha1_sign(msg.as_bytes());
+    assert!(pub_key.pkcs1v15_sha1_bad_verify(msg.as_bytes(), &signature));
+}
+
 pub fn rsa_test() {
     rsa_keypair_test(32);
     rsa_keypair_test(512);
     rsa_keypair_test(2048);
     rsa_e3_broadcast_test();
     unpadded_msg_test();
+    pkcs1v15_test();
 }
