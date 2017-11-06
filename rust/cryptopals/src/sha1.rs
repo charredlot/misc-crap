@@ -271,9 +271,8 @@ mod tests {
     extern crate rand;
 
     use self::std::prelude::v1::*;
-    use self::std::io::Write;
 
-    use Sha1;
+    use sha1::Sha1;
 
     #[test]
     fn test_simple() {
