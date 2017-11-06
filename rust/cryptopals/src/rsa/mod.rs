@@ -5,12 +5,14 @@ extern crate gmp;
 use self::gmp::mpz::Mpz;
 use util::{randomish_prime, bytes_to_mpz, mpz_bytes};
 
+#[derive(Debug)]
 pub struct PublicKey {
     // pub for debugging
     pub e: Mpz,
     pub n: Mpz,
 }
 
+#[derive(Debug)]
 pub struct PrivateKey {
     // pub for debugging
     pub d: Mpz,
@@ -22,9 +24,13 @@ impl PublicKey {
         PublicKey{e: e.clone(), n: n.clone()}
     }
 
-    pub fn encrypt(&self, msg: &[u8]) -> Vec<u8> {
+    pub fn encrypt_to_mpz(&self, msg: &[u8]) -> Mpz {
         let m = bytes_to_mpz(msg);
-        mpz_bytes(&m.powm(&self.e, &self.n))
+        m.powm(&self.e, &self.n)
+    }
+
+    pub fn encrypt(&self, msg: &[u8]) -> Vec<u8> {
+        mpz_bytes(&self.encrypt_to_mpz(msg))
     }
 }
 
