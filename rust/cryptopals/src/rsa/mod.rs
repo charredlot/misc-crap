@@ -39,9 +39,13 @@ impl PrivateKey {
         PrivateKey{d: d.clone(), n: n.clone()}
     }
 
+    pub fn decrypt_mpz(&self, ciphernum: &Mpz) -> Mpz {
+        ciphernum.powm(&self.d, &self.n)
+    }
+
     pub fn decrypt(&self, ciphertext: &[u8]) -> Vec<u8> {
         let m = bytes_to_mpz(ciphertext);
-        mpz_bytes(&m.powm(&self.d, &self.n))
+        mpz_bytes(&self.decrypt_mpz(&m))
     }
 }
 

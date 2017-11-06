@@ -76,9 +76,35 @@ fn rsa_e3_broadcast_test() {
     assert_eq!(recovered, plaintext, "rsa_e3_broadcast_test failed");
 }
 
+fn unpadded_msg_test() {
+    let plaintext = rand_bytes(32);
+    println!("rsa unpadded_msg_test plaintext {:?}", &plaintext);
+
+    let (pub_key, priv_key) = new_keypair(1024);
+    let ciphernum = pub_key.encrypt_to_mpz(&plaintext);
+
+    let s = Mpz::one() + Mpz::one();
+    let cprime = {
+        (s.powm(&pub_key.e, &pub_key.n) * &ciphernum).modulus(&pub_key.n)
+    };
+
+    // should be a server doing this here but lazymode
+    let pprime = priv_key.decrypt_mpz(&cprime);
+
+    // c' = (s ^ e) * c mod n
+    // p' = c'^d = (s^e * c)^d = s^ed * c^d mod n = s * c ^d mod n
+    // c ^ d mod n is just the plain text, so divide by s to get it
+    let plainnum = {
+        &(&pprime * s.invert(&pub_key.n).unwrap()).modulus(&pub_key.n)
+    };
+    let recovered = mpz_bytes(&plainnum);
+    assert_eq!(recovered, plaintext, "rsa unpadded_msg_test failed");
+}
+
 pub fn rsa_test() {
     rsa_keypair_test(32);
     rsa_keypair_test(512);
     rsa_keypair_test(2048);
     rsa_e3_broadcast_test();
+    unpadded_msg_test();
 }
