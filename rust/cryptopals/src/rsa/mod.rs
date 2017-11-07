@@ -21,7 +21,7 @@ pub struct PrivateKey {
     pub n: Mpz,
 }
 
-fn pkcs1v15_der_encode(sha1_hash: &[u8]) -> Vec<u8> {
+pub fn pkcs1v15_sha1_der_encode(msg: &[u8]) -> Vec<u8> {
     let mut der: Vec<u8> = Vec::new();
 
     der.push(TagType::Sequence as u8);
@@ -38,6 +38,7 @@ fn pkcs1v15_der_encode(sha1_hash: &[u8]) -> Vec<u8> {
     der.push(TagType::Null as u8);
     der.push(0u8);
 
+    let sha1_hash = sha1::digest(msg);
     der.push(TagType::OctetString as u8);
     der.push(sha1_hash.len() as u8);
     der.extend_from_slice(&sha1_hash);
@@ -166,7 +167,7 @@ impl PrivateKey {
     }
 
     pub fn pkcs1v15_sha1_sign(&self, msg: &[u8]) -> Vec<u8> {
-        let der = pkcs1v15_der_encode(&sha1::digest(msg));
+        let der = pkcs1v15_sha1_der_encode(msg);
 
         let mut res: Vec<u8> = Vec::new();
 
