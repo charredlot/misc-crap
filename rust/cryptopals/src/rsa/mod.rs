@@ -5,7 +5,8 @@ extern crate gmp;
 use asn1::PKCS1V15_SHA1_DIGEST_PREFIX;
 use self::gmp::mpz::Mpz;
 use sha1;
-use util::{randomish_prime, bytes_to_mpz, mpz_bytes};
+use util::{randomish_prime, bytes_to_mpz, mpz_bytes, mpz_byte_len,
+           mpz_bytes_zero_pad};
 
 #[derive(Debug)]
 pub struct PublicKey {
@@ -48,18 +49,8 @@ impl PublicKey {
                                     signature: &[u8]) -> bool {
         // just panic in bad places for debugging
         let bytes = {
-            // TODO: this is probably broken, but gotta zero pad at front
-            // because leading zeroes get killed by the bignum library
-            let decrypted = {
-                mpz_bytes(&bytes_to_mpz(signature).powm(&self.e, &self.n))
-            };
-            assert_eq!(decrypted.len(),
-                       ((self.n.bit_length() + 8) / 8) - 1);
-
-            let mut tmp = Vec::new();
-            tmp.push(0u8);
-            tmp.extend_from_slice(&decrypted);
-            tmp
+            let msg_num = &bytes_to_mpz(signature).powm(&self.e, &self.n);
+            mpz_bytes_zero_pad(&msg_num, mpz_byte_len(&self.n))
         };
 
         if &bytes[..3] != &[0u8, 1u8, 0xffu8] {
@@ -121,7 +112,7 @@ impl PrivateKey {
         res.push(0u8);
         res.push(1u8);
 
-        let bytes = (self.n.bit_length() + 8) / 8;
+        let bytes = mpz_byte_len(&self.n);
         // spec requires 8 padding bytes + 3 bytes (part of the encoding)
         assert!(bytes >= der.len() + 11);
         for _ in 0..bytes - der.len() - 3 {

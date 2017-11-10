@@ -77,3 +77,31 @@ pub fn randomish_prime(bit_len: usize) -> Mpz {
     let num = bytes_to_mpz(&rand_bytes(len));
     num.nextprime()
 }
+
+pub fn mpz_byte_len(mpz: &Mpz) -> usize {
+    let bit_len = mpz.bit_length();
+    if bit_len % 8 == 0 {
+        bit_len / 8
+    } else {
+        (bit_len + 8) / 8
+    }
+}
+
+pub fn mpz_bytes_zero_pad(mpz: &Mpz, len: usize) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    let actual_len = mpz_byte_len(mpz);
+    if len > actual_len {
+        for _ in 0..len - actual_len {
+            bytes.push(0u8);
+        }
+    }
+    bytes.extend(mpz_bytes(mpz));
+    bytes
+}
+
+pub fn mpz_print_padded(mpz: &Mpz, byte_len: usize) {
+    let bytes = mpz_bytes_zero_pad(mpz, byte_len);
+    for chunk in bytes.chunks(16) {
+        println!("{}", bytes_to_hex(chunk));
+    }
+}
