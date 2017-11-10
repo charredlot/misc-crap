@@ -2,7 +2,7 @@ pub mod test;
 
 extern crate gmp;
 
-use asn1::{TagType, SHA1_OID};
+use asn1::PKCS1V15_SHA1_DIGEST_PREFIX;
 use self::gmp::mpz::Mpz;
 use sha1;
 use util::{randomish_prime, bytes_to_mpz, mpz_bytes};
@@ -23,30 +23,8 @@ pub struct PrivateKey {
 
 pub fn pkcs1v15_sha1_der_encode(msg: &[u8]) -> Vec<u8> {
     let mut der: Vec<u8> = Vec::new();
-
-    der.push(TagType::Sequence as u8);
-    // length placeholder, fill later
-    der.push(0u8);
-
-    // sequence of SHA1_OID and a null for parameters
-    der.push(TagType::Sequence as u8);
-    der.push((2 + SHA1_OID.len() + 2) as u8);
-
-    der.push(TagType::OID as u8);
-    der.push(SHA1_OID.len() as u8);
-    der.extend_from_slice(&SHA1_OID);
-    der.push(TagType::Null as u8);
-    der.push(0u8);
-
-    let sha1_hash = sha1::digest(msg);
-    der.push(TagType::OctetString as u8);
-    der.push(sha1_hash.len() as u8);
-    der.extend_from_slice(&sha1_hash);
-
-    // XXX: for bigger hashes might be a prob?
-    assert!(der.len() < 128);
-    // 1 byte for tag type and 1 byte for len
-    der[1] = (der.len() - 2) as u8;
+    der.extend_from_slice(&PKCS1V15_SHA1_DIGEST_PREFIX);
+    der.extend_from_slice(&sha1::digest(msg));
     der
 }
 
@@ -88,7 +66,7 @@ impl PublicKey {
             return false;
         }
 
-        let mut der_index: usize = {
+        let der_index: usize = {
             // NB: seems like a spurious unused assignment warning.
             // we could totally hit a case where index isn't set in the loop
             let mut index = bytes.len();
@@ -101,54 +79,22 @@ impl PublicKey {
             }
             index + 3
         };
-        let mut len: usize = 0;
 
-        // TODO: blechhhhh should do this cleaner
-        if der_index >= bytes.len() {
-            return false;
-        }
-
-        if bytes[der_index] != TagType::Sequence as u8 {
-            return false;
-        }
-        der_index += 1;
-
-        // just check this len, but ignore it otherwise
-        len = bytes[der_index] as usize;
-        der_index += 1;
-        if der_index + len > bytes.len() {
-            return false;
-        }
-
-        if bytes[der_index] != TagType::Sequence as u8 {
-            return false;
-        }
-        der_index += 1;
-
-        // TODO: this sequence is hash algorithm and params, which
-        // we should verify, but we'll just skip over it for now
-        // (+1 is for the length byte itself)
-        der_index += bytes[der_index] as usize + 1;
-        if der_index >= bytes.len() {
-            return false;
-        }
-
-        if bytes[der_index] != TagType::OctetString as u8 {
-            return false;
-        }
-        der_index += 1;
-
-        len = bytes[der_index] as usize;
-        der_index += 1;
-        if der_index + len > bytes.len() {
+        let prefix_len = PKCS1V15_SHA1_DIGEST_PREFIX.len();
+        if bytes.len() < (der_index + prefix_len + sha1::DIGEST_LENGTH) {
             // NB: we should check here on the good version that
             // it exactly equals bytes.len()
             return false;
         }
 
+        if &bytes[der_index..der_index + prefix_len] !=
+           &PKCS1V15_SHA1_DIGEST_PREFIX as &[u8] {
+            return false;
+        }
 
-        assert_eq!(&sha1::digest(&msg), &bytes[der_index..]);
-        &sha1::digest(&msg) == &bytes[der_index..der_index + len]
+        let hash_index = der_index + prefix_len;
+        &sha1::digest(&msg) == &bytes[hash_index..
+                                      hash_index + sha1::DIGEST_LENGTH]
     }
 }
 
