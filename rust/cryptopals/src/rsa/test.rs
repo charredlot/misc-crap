@@ -6,8 +6,10 @@ use util::{rand_bytes, mpz_bytes};
 use rsa::{new_keypair, PublicKey, PrivateKey};
 
 fn rsa_keypair_test(bit_len: usize) {
-    let plaintext = rand_bytes((bit_len / 8) - 1);
     let (pub_key, priv_key) = new_keypair(bit_len);
+
+    // NB: RSA can only encrypt things smaller than n
+    let plaintext = rand_bytes((bit_len / 8) / 2);
 
     println!("RSA keypair test with bit_len {} plaintext {:?}",
              bit_len, plaintext);
