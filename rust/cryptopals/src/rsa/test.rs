@@ -1,9 +1,9 @@
 extern crate gmp;
 
 use self::gmp::mpz::Mpz;
-use util::{rand_bytes, mpz_bytes};
+use util::{rand_bytes, bytes_to_mpz, mpz_bytes, mpz_print_padded};
 
-use rsa::{new_keypair, PublicKey, PrivateKey};
+use rsa::{new_keypair, PublicKey, PrivateKey, pkcs1v15_sha1_der_encode};
 
 fn rsa_keypair_test(bit_len: usize) {
     let (pub_key, priv_key) = new_keypair(bit_len);
@@ -103,6 +103,96 @@ fn unpadded_msg_test() {
     assert_eq!(recovered, plaintext, "rsa unpadded_msg_test failed");
 }
 
+fn bsearch_cube_root(floor_start: &Mpz, ceil_start: &Mpz,
+                     target: &Mpz) -> Option<Mpz> {
+    let two = Mpz::one() + Mpz::one();
+    let mut floor = floor_start.clone();
+    let mut ceil = ceil_start.clone();
+    while floor < ceil {
+        let guess = &floor + ((&ceil - &floor) / &two);
+        let root = guess.root(3);
+        let result = root.pow(3);
+        if result == guess {
+            return Some(root);
+        }
+
+        if &result < target {
+            floor = guess;
+        } else {
+            ceil = guess;
+        }
+
+        if &floor + Mpz::one() == ceil {
+            // breaks the tie when guess isn't moving any more
+            break;
+        }
+    }
+
+    return None;
+}
+
+fn pkcs1v15_cube_root(der: &Mpz, der_len: usize) -> Option<Mpz> {
+    // pkcs1v15 starts with 00 01 ff ... ff 00 ASN.1 hash
+    // TODO: min padding is 8 bytes but can't seem to find a cube root
+    // with >= 8 bytes
+    let mut prefix = vec!(0x01u8);
+    loop {
+        prefix.push(0xffu8);
+
+        // top byte is zero
+        // there's a zero byte after padding
+        // 35 is the sha1 len
+        let used_len = 1 + prefix.len() + 1 + der_len;
+        if used_len * 8 >= 1024 {
+            break;
+        }
+
+        // shift prefix to 1 byte right of 1024-bit
+        let mut num = bytes_to_mpz(&prefix);
+        num <<= 1024 - ((1 + prefix.len()) * 8);
+
+        // put der 1 byte to the right of the prefix
+        num += der << (1024 - (used_len * 8));
+
+        // technically we can play with the lowest set bit, but any value that
+        // is greater than the lowest byte will mess up our sha1 hash. we can
+        // only allow garbage on the bits below it
+        let ceil = &num + (&Mpz::one() << (1024 - (used_len * 8)));
+        match bsearch_cube_root(&num, &ceil, &num) {
+            Some(n) => return Some(n),
+            None => {},
+        }
+    }
+
+    panic!("no cube root found");
+}
+
+fn pkcs1v15_e3_no_pad_check_test() {
+    const BIT_LEN: usize = 1024;
+    let (pub_key, priv_key) = new_keypair(BIT_LEN);
+    let plaintext = "hi mom";
+    let der = &pkcs1v15_sha1_der_encode(plaintext.as_bytes());
+    let der_num = bytes_to_mpz(&der);
+
+    let forged_signature = match pkcs1v15_cube_root(&der_num, der.len()) {
+        Some(n) => {
+            println!("pkcs1v15_e3_no_pad_check_test forged:");
+            mpz_print_padded(&n.pow(3), 1024 / 8);
+            mpz_bytes(&n)
+        },
+        None => panic!("pkcs1v15_e3_no_pad_check_test couldn't find root"),
+    };
+
+    let signature = priv_key.pkcs1v15_sha1_sign(plaintext.as_bytes());
+    assert!(pub_key.pkcs1v15_sha1_bad_verify(plaintext.as_bytes(),
+                                             &signature));
+
+    assert!(pub_key.pkcs1v15_sha1_bad_verify(plaintext.as_bytes(),
+                                             &forged_signature),
+            "pkcs1v15_e3_no_pad_check_test forgery failed {:?}",
+            &forged_signature);
+}
+
 fn pkcs1v15_test() {
     let (pub_key, priv_key) = new_keypair(512);
     println!("pkcs1v15_test {:?} {:?}", &pub_key, &priv_key);
@@ -118,4 +208,5 @@ pub fn rsa_test() {
     rsa_e3_broadcast_test();
     unpadded_msg_test();
     pkcs1v15_test();
+    pkcs1v15_e3_no_pad_check_test();
 }
