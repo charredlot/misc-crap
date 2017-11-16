@@ -49,10 +49,12 @@ class PlayerChar(object):
 class Wall(object):
     WIDTH = 10
     COLOR = (255, 255, 255)
-    def __init__(self, top_left, bottom_right):
-        self.rect = pygame.Rect(top_left[0], top_left[1],
-                                bottom_right[0] - top_left[0],
-                                bottom_right[1] - top_left[1])
+    def __init__(self, x, y, width, height):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.left = x
+        self.right = x + width
+        self.top = y
+        self.bottom = y + height
 
     def draw(self, display):
         pygame.draw.rect(display, Wall.COLOR, self.rect)
@@ -73,8 +75,12 @@ class Game(object):
     def init_scene(self):
         pygame.init()
         self.display = pygame.display.set_mode((self.width, self.height))
-        self.obstacles = []
-        self.obstacles.append(Wall((0, 0), (Wall.WIDTH, self.height)))
+        self.obstacles = [
+            Wall(0, 0, Wall.WIDTH, self.height),
+            Wall(0, 0, self.width, Wall.WIDTH),
+            Wall(0, self.height - Wall.WIDTH, self.width, Wall.WIDTH),
+            Wall(self.width - Wall.WIDTH, 0, Wall.WIDTH, self.height),
+        ]
         self.player = PlayerChar((30, 30), (0xff, 0xff, 0xff))
         self.player.selected = True
 
@@ -84,9 +90,9 @@ class Game(object):
             obstacle.draw(self.display)
         self.player.draw(self.display)
 
-    def game_input(self, pressed):
+    def player_movement(self, pressed):
         if self.player is None:
-            return
+            return None
 
         x = 0
         y = 0
@@ -99,15 +105,36 @@ class Game(object):
         if pressed[self.MOVE_RIGHT]:
             x += 1
 
-        if x != 0 or y != 0:
-            # normalize diagonal movement
-            norm = sqrt((x * x) + (y * y))
-            uv = ((float(x) / norm) * self.player.speed,
-                  (float(y) / norm) * self.player.speed)
-            self.player.move(uv)
+        if x == 0 and y == 0:
+            return None
 
-    def ui_input(self, pressed):
-        pass
+        # normalize diagonal movement
+        norm = sqrt((x * x) + (y * y))
+        return ((float(x) / norm) * self.player.speed,
+                (float(y) / norm) * self.player.speed)
+
+    def resolve_movement(self, pressed):
+        vec = self.player_movement(pressed)
+        if vec is not None:
+            dx, dy = vec
+            # TODO: kinda messy, could probably do it more explicitly?
+            for dx, dy in ((vec[0], 0), (0, vec[1])):
+                self.player.rect.move_ip(dx, dy)
+                for obstacle in self.obstacles:
+                    if not self.player.rect.colliderect(obstacle.rect):
+                        continue
+
+                    if dx > 0:
+                        # collide from the left
+                        self.player.rect.right = obstacle.rect.left
+                    elif dx < 0:
+                        self.player.rect.left = obstacle.rect.right
+
+                    if dy > 0:
+                        # collide from above
+                        self.player.rect.bottom = obstacle.rect.top
+                    elif dy < 0:
+                        self.player.rect.top = obstacle.rect.bottom
 
 def main():
     parser = ArgumentParser()
@@ -136,9 +163,8 @@ def main():
                 print("got quit event {}".format(event))
                 break
         pressed = pygame.key.get_pressed()
-        g.game_input(pressed)
-        g.ui_input(pressed)
 
+        g.resolve_movement(pressed)
         g.redraw()
         pygame.display.flip()
         clock.tick(FRAME_RATE)
