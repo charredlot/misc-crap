@@ -113,7 +113,8 @@ impl PrivateKey {
         res.push(1u8);
 
         let bytes = mpz_byte_len(&self.n);
-        // spec requires 8 padding bytes + 3 bytes (part of the encoding)
+        // NB: spec requires 8 padding bytes + 3 bytes (part of the encoding)
+        // but ignore it for challenge 42
         assert!(bytes >= der.len() + 11);
         for _ in 0..bytes - der.len() - 3 {
             res.push(0xffu8);
