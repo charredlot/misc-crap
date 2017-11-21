@@ -19,45 +19,45 @@ class Drawable(metaclass=ABCMeta):
 
 
 @Drawable.register
-class PlayerChar(object):
+class PlayerChar(pygame.sprite.Sprite):
     BORDER = 5
     WIDTH = 60
     SELECT_COLOR = (0, 192, 32)
     def __init__(self, pos, color):
-        x, y = pos
-        self.rect = pygame.Rect(x, y, PlayerChar.WIDTH, PlayerChar.WIDTH)
-        self.outline = pygame.Rect(x - PlayerChar.BORDER,
-                                   y - PlayerChar.BORDER,
-                                   PlayerChar.WIDTH + (2 * PlayerChar.BORDER),
-                                   PlayerChar.WIDTH + (2 * PlayerChar.BORDER))
+        super().__init__()
+        self.image = pygame.image.load("pig_down.png").convert_alpha()
+        self.rect = self.image.get_rect()
+        self.rect.x, self.rect.y = pos
+
+        width = self.rect.width
+        self.outline = pygame.Rect(self.rect.x - PlayerChar.BORDER,
+                                   self.rect.y - PlayerChar.BORDER,
+                                   width + (2 * PlayerChar.BORDER),
+                                   width + (2 * PlayerChar.BORDER))
         self.color = color
         self.selected = False
         self.speed = 5
 
-    def draw(self, display):
-        if self.selected:
-            self.outline.x = self.rect.x - PlayerChar.BORDER
-            self.outline.y = self.rect.y - PlayerChar.BORDER
-            pygame.draw.rect(display, PlayerChar.SELECT_COLOR, self.outline)
-        pygame.draw.rect(display, self.color, self.rect)
+    def draw_selected(self, display):
+        self.outline.x = self.rect.x - PlayerChar.BORDER
+        self.outline.y = self.rect.y - PlayerChar.BORDER
+        pygame.draw.rect(display, PlayerChar.SELECT_COLOR, self.outline,
+                         PlayerChar.BORDER)
 
-    def move(self, vec):
-        self.rect.x += vec[0]
-        self.rect.y += vec[1]
 
 @Drawable.register
-class Wall(object):
+class Wall(pygame.sprite.Sprite):
     WIDTH = 10
     COLOR = (255, 255, 255)
     def __init__(self, x, y, width, height):
-        self.rect = pygame.Rect(x, y, width, height)
-        self.left = x
-        self.right = x + width
-        self.top = y
-        self.bottom = y + height
+        super().__init__()
+        self.image = pygame.Surface([width, height])
+        self.image.fill(Wall.COLOR)
 
-    def draw(self, display):
-        pygame.draw.rect(display, Wall.COLOR, self.rect)
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+
 
 class Game(object):
     MOVE_UP = pygame.K_UP
@@ -70,25 +70,31 @@ class Game(object):
         self.width = width
         self.height = height
         self.display = None
+        self.player_chars = pygame.sprite.Group()
         self.player = None
 
     def init_scene(self):
         pygame.init()
         self.display = pygame.display.set_mode((self.width, self.height))
-        self.obstacles = [
-            Wall(0, 0, Wall.WIDTH, self.height),
-            Wall(0, 0, self.width, Wall.WIDTH),
-            Wall(0, self.height - Wall.WIDTH, self.width, Wall.WIDTH),
-            Wall(self.width - Wall.WIDTH, 0, Wall.WIDTH, self.height),
-        ]
+
+        self.obstacles = pygame.sprite.Group()
+        self.obstacles.add(Wall(0, 0, Wall.WIDTH, self.height))
+        self.obstacles.add(Wall(0, 0, self.width, Wall.WIDTH))
+        self.obstacles.add(Wall(0, self.height - Wall.WIDTH,
+                           self.width, Wall.WIDTH))
+        self.obstacles.add(Wall(self.width - Wall.WIDTH, 0,
+                                Wall.WIDTH, self.height))
+
         self.player = PlayerChar((30, 30), (0xff, 0xff, 0xff))
         self.player.selected = True
+        self.player_chars.add(self.player)
 
     def redraw(self):
         self.display.fill(Game.BG_COLOR)
-        for obstacle in self.obstacles:
-            obstacle.draw(self.display)
-        self.player.draw(self.display)
+        self.obstacles.draw(self.display)
+
+        self.player.draw_selected(self.display)
+        self.player_chars.draw(self.display)
 
     def player_movement(self, pressed):
         if self.player is None:
@@ -115,26 +121,29 @@ class Game(object):
 
     def resolve_movement(self, pressed):
         vec = self.player_movement(pressed)
-        if vec is not None:
-            dx, dy = vec
-            # TODO: kinda messy, could probably do it more explicitly?
-            for dx, dy in ((vec[0], 0), (0, vec[1])):
-                self.player.rect.move_ip(dx, dy)
-                for obstacle in self.obstacles:
-                    if not self.player.rect.colliderect(obstacle.rect):
-                        continue
+        if vec is None:
+            return
 
-                    if dx > 0:
-                        # collide from the left
-                        self.player.rect.right = obstacle.rect.left
-                    elif dx < 0:
-                        self.player.rect.left = obstacle.rect.right
+        dx, dy = vec
+        # TODO: kinda messy, could probably do it more explicitly?
+        for dx, dy in ((vec[0], 0), (0, vec[1])):
+            self.player.rect.move_ip(dx, dy)
+            collided = pygame.sprite.spritecollide(self.player,
+                                                   self.obstacles,
+                                                   False)
+            for obstacle in collided:
+                if dx > 0:
+                    # collide from the left
+                    self.player.rect.right = obstacle.rect.left
+                elif dx < 0:
+                    self.player.rect.left = obstacle.rect.right
 
-                    if dy > 0:
-                        # collide from above
-                        self.player.rect.bottom = obstacle.rect.top
-                    elif dy < 0:
-                        self.player.rect.top = obstacle.rect.bottom
+                if dy > 0:
+                    # collide from above
+                    self.player.rect.bottom = obstacle.rect.top
+                elif dy < 0:
+                    self.player.rect.top = obstacle.rect.bottom
+
 
 def main():
     parser = ArgumentParser()
