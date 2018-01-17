@@ -1,6 +1,8 @@
 #!/bin/bash -x
 
-# For wifi without network manager
+# For wifi without network manager (ubuntu)
+# sudo systemctl stop NetworkManager.service
+# sudo systemctl disable NetworkManager.service
 
 # wifi intf name
 INTF="wlp4s0"
