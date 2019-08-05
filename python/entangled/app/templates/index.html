@@ -1,0 +1,193 @@
+<html>
+
+    <head>
+        <script src="/static/jquery.3.4.1.min.js"></script>
+
+        <script>
+"use strict";
+var grid = {};
+var tiles;
+var center = {x: 0, y: 0};
+var cameraOffset = {dx: 0, dy: 0};
+var sqrt3 = Math.sqrt(3);
+var halfSqrt3 = Math.sqrt(3) / 2;
+
+// this is the viewport canvas element that the user sees
+var viewport;
+var viewportCtx;
+// the size of the hexes should be based on the visible viewport
+var viewportHexRadius;
+
+// this canvas element holds the full grid, which might be bigger than the
+//viewport
+var gridCanvas;
+var gridCanvasCtx;
+var margin = 20;
+
+function setKeys() {
+    let keybinds = {};
+    
+    keybinds["w".charCodeAt(0)] = function() { cameraOffset.dy += 10; },
+    keybinds["a".charCodeAt(0)] = function() { cameraOffset.dx += 10; },
+    keybinds["s".charCodeAt(0)] = function() { cameraOffset.dy -= 10; },
+    keybinds["d".charCodeAt(0)] = function() { cameraOffset.dx -= 10; },
+    console.log(keybinds);
+
+    $(window).on("keypress", function(evt) {
+        let f = keybinds[evt.keyCode];
+        
+        if (f === undefined) {
+            return;
+        }
+
+        console.log(evt.keyCode, evt.code);
+
+        let prevCameraOffset = Object.assign({}, cameraOffset);
+        f();
+        if ((prevCameraOffset.dx !== cameraOffset.dx) ||
+            (prevCameraOffset.dy !== cameraOffset.dy)) {
+            viewportCtx.clearRect(0, 0, viewport.width, viewport.height);
+            viewportCtx.drawImage(gridCanvas,
+                                  cameraOffset.dx,
+                                  cameraOffset.dy);
+        }
+
+    });
+}
+
+function axialToPoint(q, r, radius) {
+    return {
+        x: radius * ((sqrt3 * q) + (halfSqrt3 * r)),
+        y: radius * r * 3 / 2,
+    }
+}
+
+// get all the hexagon points given the center point and a radius
+function hexPoints(centerX, centerY, radius) {
+    // start at the pointy bottom and go counterclockwise
+    return [
+        {x: centerX, y: centerY + radius},
+        {x: centerX + (halfSqrt3 * radius), y: centerY + (radius / 2)},
+        {x: centerX + (halfSqrt3 * radius), y: centerY - (radius / 2)},
+        {x: centerX, y: centerY - radius},
+        {x: centerX - (halfSqrt3 * radius), y: centerY - (radius / 2)},
+        {x: centerX - (halfSqrt3 * radius), y: centerY + (radius / 2)},
+    ];
+}
+
+// ctx is a canvas 2D context
+// points is a list like [{x: x, y: y}, ...]
+// it should have 6 points
+function drawHex(ctx, points) {
+    ctx.beginPath();
+    let point = points[0];
+    ctx.moveTo(point.x, point.y);
+    for (let i = 1; i < points.length; i++) {
+        point = points[i];
+        ctx.lineTo(point.x, point.y);
+    }
+    ctx.closePath();
+
+    ctx.fillStyle = "#00bb22";
+    ctx.fill();
+
+    ctx.strokeStyle = "black";
+    ctx.stroke();
+}
+
+function onLoad() {
+    $.ajax({
+        url: "/grid",
+        success: function(result) {
+            setKeys();
+
+            viewport = document.getElementById("theviewport");
+            viewportCtx = viewport.getContext('2d');
+            viewportHexRadius = viewport.height / 20;
+
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+
+            // find the max size of a theoretical canvas that could hold the
+            // entire grid. though the size of the grid is scaled to the
+            // viewport. the viewport will just use an offset to figure out
+            // which part of the grid is currently visible
+            tiles = JSON.parse(result);
+            for (let i in tiles) {
+                let hex = tiles[i];
+
+                if (grid[hex.q] === undefined) {
+                    grid[hex.q] = {};
+                }
+                grid[hex.q][hex.r] = {};
+
+                let hexCenter = axialToPoint(hex.q, hex.r, viewportHexRadius);
+                let points = hexPoints(hexCenter.x, hexCenter.y,
+                                       viewportHexRadius);
+
+                for (let j in points) {
+                    let point = points[j];
+                    minX = Math.min(minX, point.x);
+                    maxX = Math.max(maxX, point.x);
+                    minY = Math.min(minY, point.y);
+                    maxY = Math.max(maxY, point.y);
+                }
+            }
+
+            minX -= margin;
+            maxX += margin;
+            minY -= margin;
+            maxY += margin;
+
+            gridCanvas = document.createElement("canvas");
+            gridCanvas.width = maxX - minX;
+            gridCanvas.height = maxY - minY;
+            gridCanvasCtx = gridCanvas.getContext("2d");
+
+            console.log(minX, maxX, minY, maxY);
+            console.log(gridCanvas.width, gridCanvas.height);
+
+            for (let i in tiles) {
+                let tile = tiles[i];
+                let tileCenter = axialToPoint(tile.q, tile.r,
+                                              viewportHexRadius);
+                let points = hexPoints(tileCenter.x, tileCenter.y,
+                                       viewportHexRadius);
+
+                // offset everything so the top left of the grid matches the
+                // top left of gridCanvas
+                for (let j in points) {
+                    points[j].x -= minX;
+                    points[j].y -= minY;
+                }
+
+                let hex = grid[tile.q][tile.r];
+                hex.points = points;
+
+                drawHex(gridCanvasCtx, points);
+               
+                // XXX: this is debugging, remove later
+                gridCanvasCtx.font = "8px Courier New";
+                gridCanvasCtx.fillStyle = "black";
+                gridCanvasCtx.fillText(tile.q + ", " + tile.r,
+                                       tileCenter.x - (viewportHexRadius / 2) - minX,
+                                       tileCenter.y - minY);
+            }
+            viewportCtx.drawImage(gridCanvas, 0, 0);
+        }
+    });
+}
+
+$( window ).on("load", onLoad);
+        </script>
+
+    <head>
+
+    <body>
+        <h1>boop</h1>
+        <canvas id="theviewport" width=800 height=600>
+        </canvas>
+    </body>
+</html>
