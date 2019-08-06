@@ -18,18 +18,21 @@ class HexTile():
 
 
 class HexGrid():
-    def __init__(self):
-        self._tiles = dict()
+    def __init__(self, coords=None):
+        if not coords:
+            self.tiles = dict()
+        else:
+            self.tiles = {coord: HexTile(coord) for coord in coords}
         self._min_q = None
         self._max_r = None
         self._min_r = None
         self._max_r = None
 
     def add(self, tile: HexTile):
-        self._tiles[tile.coord] = tile
+        self.tiles[tile.coord] = tile
 
     def __repr__(self):
-        return "\n".join(str(coord) for coord in self._tiles.keys())
+        return "\n".join(str(coord) for coord in self.tiles.keys())
 
 
 @singledispatch
@@ -39,7 +42,7 @@ def to_json(val):
 
 @to_json.register(HexGrid)
 def hex_grid_json(grid):
-    return [{"q": coord.q, "r": coord.r} for coord in grid._tiles.keys()]
+    return [{"q": coord.q, "r": coord.r} for coord in grid.tiles.keys()]
 
 
 def coords_circle(center: AxialCoord, radius: int):
