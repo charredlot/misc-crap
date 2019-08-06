@@ -18,11 +18,17 @@ var viewportCtx;
 // the size of the hexes should be based on the visible viewport
 var viewportHexRadius;
 
-// this canvas element holds the full grid, which might be bigger than the
-//viewport
-var gridCanvas;
-var gridCanvasCtx;
+// this array of canvas elements hold the full grid, which might be bigger than
+// the viewport. all the layers have the same dimensions
+var canvasLayers;
 var margin = 20;
+
+function redraw() {
+    viewportCtx.clearRect(0, 0, viewport.width, viewport.height);
+    canvasLayers.forEach(function(layer) {
+        viewportCtx.drawImage(layer.canvas, cameraOffset.dx, cameraOffset.dy);
+    });
+}
 
 function setKeys() {
     let keybinds = {};
@@ -46,10 +52,7 @@ function setKeys() {
         f();
         if ((prevCameraOffset.dx !== cameraOffset.dx) ||
             (prevCameraOffset.dy !== cameraOffset.dy)) {
-            viewportCtx.clearRect(0, 0, viewport.width, viewport.height);
-            viewportCtx.drawImage(gridCanvas,
-                                  cameraOffset.dx,
-                                  cameraOffset.dy);
+            redraw();
         }
 
     });
@@ -93,6 +96,22 @@ function drawHex(ctx, points) {
 
     ctx.strokeStyle = "black";
     ctx.stroke();
+}
+
+function initLayers(width, height) {
+    console.log("grid dimensions:", width, height);
+
+    canvasLayers = [];
+    for (let i = 0; i < 3; i++) {
+        let c = document.createElement("canvas");
+        c.width = width;
+        c.height = height;
+
+        canvasLayers.push({
+            canvas: c,
+            ctx: c.getContext("2d"),
+        });
+    }
 }
 
 function onLoad() {
@@ -140,13 +159,9 @@ function onLoad() {
             minY -= margin;
             maxY += margin;
 
-            gridCanvas = document.createElement("canvas");
-            gridCanvas.width = maxX - minX;
-            gridCanvas.height = maxY - minY;
-            gridCanvasCtx = gridCanvas.getContext("2d");
+            console.log("x range:", minX, maxX, "y range:", minY, maxY);
 
-            console.log(minX, maxX, minY, maxY);
-            console.log(gridCanvas.width, gridCanvas.height);
+            initLayers(maxX - minX, maxY - minY);
 
             Object.getOwnPropertyNames(grid).forEach(function(q) {
                 let rgrid = grid[q];
@@ -154,25 +169,25 @@ function onLoad() {
                     let hex = grid[q][r];
 
                     // offset everything so the top left of the grid matches
-                    // the top left of gridCanvas. we want to actually modify
-                    // the vertices array in hex.
+                    // the top left of grid's canvas. we want to actually
+                    // modify the vertices array in hex.
                     hex.vertices.forEach(function(unused, i, vertices) {
                         vertices[i].x -= minX;
                         vertices[i].y -= minY;
                     });
 
-                    drawHex(gridCanvasCtx, hex.vertices);
+                    drawHex(canvasLayers[0].ctx, hex.vertices);
                
                     // XXX: this is debugging, remove later
-                    gridCanvasCtx.font = "8px Courier New";
-                    gridCanvasCtx.fillStyle = "black";
-                    gridCanvasCtx.fillText(
+                    canvasLayers[1].ctx.font = "8px Courier New";
+                    canvasLayers[1].ctx.fillStyle = "black";
+                    canvasLayers[1].ctx.fillText(
                         q + ", " + r,
                         hex.center.x - (viewportHexRadius / 2) - minX,
                         hex.center.y - minY);
                 });
             });
-            viewportCtx.drawImage(gridCanvas, 0, 0);
+            redraw();
         }
     });
 }
