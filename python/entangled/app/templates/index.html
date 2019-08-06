@@ -62,8 +62,8 @@ function axialToPoint(q, r, radius) {
     }
 }
 
-// get all the hexagon points given the center point and a radius
-function hexPoints(centerX, centerY, radius) {
+// get all the hexagon vertices given the center point and a radius
+function hexVertices(centerX, centerY, radius) {
     // start at the pointy bottom and go counterclockwise
     return [
         {x: centerX, y: centerY + radius},
@@ -115,26 +115,25 @@ function onLoad() {
             // viewport. the viewport will just use an offset to figure out
             // which part of the grid is currently visible
             tiles = JSON.parse(result);
-            for (let i = 0; i < tiles.length; i++) {
-                let hex = tiles[i];
+            tiles.forEach(function(tile) {
+                let hex = {};
 
-                if (grid[hex.q] === undefined) {
-                    grid[hex.q] = {};
+                if (grid[tile.q] === undefined) {
+                    grid[tile.q] = {};
                 }
-                grid[hex.q][hex.r] = {};
+                grid[tile.q][tile.r] = hex;
 
-                let hexCenter = axialToPoint(hex.q, hex.r, viewportHexRadius);
-                let points = hexPoints(hexCenter.x, hexCenter.y,
-                                       viewportHexRadius);
+                hex.center = axialToPoint(tile.q, tile.r, viewportHexRadius);
+                hex.vertices = hexVertices(hex.center.x, hex.center.y,
+                                           viewportHexRadius);
 
-                for (let j = 0; j < points.length; j++) {
-                    let point = points[j];
-                    minX = Math.min(minX, point.x);
-                    maxX = Math.max(maxX, point.x);
-                    minY = Math.min(minY, point.y);
-                    maxY = Math.max(maxY, point.y);
-                }
-            }
+                hex.vertices.forEach(function(vertex) {
+                    minX = Math.min(minX, vertex.x);
+                    maxX = Math.max(maxX, vertex.x);
+                    minY = Math.min(minY, vertex.y);
+                    maxY = Math.max(maxY, vertex.y);
+                });
+            });
 
             minX -= margin;
             maxX += margin;
@@ -149,32 +148,30 @@ function onLoad() {
             console.log(minX, maxX, minY, maxY);
             console.log(gridCanvas.width, gridCanvas.height);
 
-            for (let i = 0; i < tiles.length; i++) {
-                let tile = tiles[i];
-                let tileCenter = axialToPoint(tile.q, tile.r,
-                                              viewportHexRadius);
-                let points = hexPoints(tileCenter.x, tileCenter.y,
-                                       viewportHexRadius);
+            Object.getOwnPropertyNames(grid).forEach(function(q) {
+                let rgrid = grid[q];
+                Object.getOwnPropertyNames(rgrid).forEach(function (r) {
+                    let hex = grid[q][r];
 
-                // offset everything so the top left of the grid matches the
-                // top left of gridCanvas
-                for (let j = 0; j < points.length; j++) {
-                    points[j].x -= minX;
-                    points[j].y -= minY;
-                }
+                    // offset everything so the top left of the grid matches
+                    // the top left of gridCanvas. we want to actually modify
+                    // the vertices array in hex.
+                    hex.vertices.forEach(function(unused, i, vertices) {
+                        vertices[i].x -= minX;
+                        vertices[i].y -= minY;
+                    });
 
-                let hex = grid[tile.q][tile.r];
-                hex.points = points;
-
-                drawHex(gridCanvasCtx, points);
+                    drawHex(gridCanvasCtx, hex.vertices);
                
-                // XXX: this is debugging, remove later
-                gridCanvasCtx.font = "8px Courier New";
-                gridCanvasCtx.fillStyle = "black";
-                gridCanvasCtx.fillText(tile.q + ", " + tile.r,
-                                       tileCenter.x - (viewportHexRadius / 2) - minX,
-                                       tileCenter.y - minY);
-            }
+                    // XXX: this is debugging, remove later
+                    gridCanvasCtx.font = "8px Courier New";
+                    gridCanvasCtx.fillStyle = "black";
+                    gridCanvasCtx.fillText(
+                        q + ", " + r,
+                        hex.center.x - (viewportHexRadius / 2) - minX,
+                        hex.center.y - minY);
+                });
+            });
             viewportCtx.drawImage(gridCanvas, 0, 0);
         }
     });
