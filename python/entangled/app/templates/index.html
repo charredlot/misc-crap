@@ -115,7 +115,7 @@ function onLoad() {
             // viewport. the viewport will just use an offset to figure out
             // which part of the grid is currently visible
             tiles = JSON.parse(result);
-            for (let i in tiles) {
+            for (let i = 0; i < tiles.length; i++) {
                 let hex = tiles[i];
 
                 if (grid[hex.q] === undefined) {
@@ -127,7 +127,7 @@ function onLoad() {
                 let points = hexPoints(hexCenter.x, hexCenter.y,
                                        viewportHexRadius);
 
-                for (let j in points) {
+                for (let j = 0; j < points.length; j++) {
                     let point = points[j];
                     minX = Math.min(minX, point.x);
                     maxX = Math.max(maxX, point.x);
@@ -149,7 +149,7 @@ function onLoad() {
             console.log(minX, maxX, minY, maxY);
             console.log(gridCanvas.width, gridCanvas.height);
 
-            for (let i in tiles) {
+            for (let i = 0; i < tiles.length; i++) {
                 let tile = tiles[i];
                 let tileCenter = axialToPoint(tile.q, tile.r,
                                               viewportHexRadius);
@@ -158,7 +158,7 @@ function onLoad() {
 
                 // offset everything so the top left of the grid matches the
                 // top left of gridCanvas
-                for (let j in points) {
+                for (let j = 0; j < points.length; j++) {
                     points[j].x -= minX;
                     points[j].y -= minY;
                 }
