@@ -6,9 +6,19 @@ from functools import singledispatch
 
 AxialCoord = namedtuple("AxialCoord", ["q", "r"])
 
+class Unit():
+    PLAYER_CONTROL = 1
+    CPU_CONTROL = 2
+
+    def __init__(self, control=CPU_CONTROL, friendly=False):
+        self.friendly = friendly
+        self.control = control
+
+
 class HexTile():
     def __init__(self, coord: AxialCoord):
         self.coord = coord
+        self.unit = None
 
     def __hash__(self):
         return hash(self.coord)
@@ -31,6 +41,9 @@ class HexGrid():
     def add(self, tile: HexTile):
         self.tiles[tile.coord] = tile
 
+    def get(self, q, r):
+        return self.tiles.get(AxialCoord(q, r))
+
     def __repr__(self):
         return "\n".join(str(coord) for coord in self.tiles.keys())
 
@@ -40,9 +53,18 @@ def to_json(val):
     return json.dumps(val)
 
 
+@to_json.register(Unit)
+def unit_json(unit):
+    return {"friendly": unit.friendly,
+            "control": unit.control}
+
+
 @to_json.register(HexGrid)
 def hex_grid_json(grid):
-    return [{"q": coord.q, "r": coord.r} for coord in grid.tiles.keys()]
+    return [{"q": coord.q,
+             "r": coord.r,
+             "unit": unit_json(tile.unit) if tile.unit else None}
+            for coord, tile in grid.tiles.items()]
 
 
 def coords_circle(center: AxialCoord, radius: int):

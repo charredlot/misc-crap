@@ -1,7 +1,7 @@
 from flask import g, Flask
 
 from app import routes
-from level import AxialCoord, HexGrid
+from level import AxialCoord, HexGrid, Unit
 
 
 def create_app(test_config=None):
@@ -44,6 +44,16 @@ def create_app(test_config=None):
         AxialCoord(3, -4),
         AxialCoord(3, -3),
     ))
+    for coord in (AxialCoord(2, 2), AxialCoord(1, 3)):
+        tile = currentGrid.tiles[coord]
+        tile.unit = Unit(friendly=True, control=Unit.PLAYER_CONTROL)
+
+    for coord in (AxialCoord(-1, -3),
+                  AxialCoord(-2, -4),
+                  AxialCoord(-2, -3),
+                  AxialCoord(3, -4)):
+        tile = currentGrid.tiles[coord]
+        tile.unit = Unit()
 
     with app.app_context():
         app.currentGrid = currentGrid

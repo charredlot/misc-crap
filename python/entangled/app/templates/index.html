@@ -98,6 +98,17 @@ function drawHex(ctx, points) {
     ctx.stroke();
 }
 
+function drawUnit(ctx, centerX, centerY, fillStyle) {
+    ctx.beginPath();
+    ctx.arc(centerX,
+            centerY,
+            viewportHexRadius / 2,
+            0,
+            2 * Math.PI);
+    ctx.fillStyle = fillStyle;
+    ctx.fill();
+}
+
 function initLayers(width, height) {
     console.log("grid dimensions:", width, height);
 
@@ -146,6 +157,10 @@ function onLoad() {
                 hex.vertices = hexVertices(hex.center.x, hex.center.y,
                                            viewportHexRadius);
 
+                if (tile.unit) {
+                    hex.unit = tile.unit;
+                }
+
                 hex.vertices.forEach(function(vertex) {
                     minX = Math.min(minX, vertex.x);
                     maxX = Math.max(maxX, vertex.x);
@@ -171,20 +186,31 @@ function onLoad() {
                     // offset everything so the top left of the grid matches
                     // the top left of grid's canvas. we want to actually
                     // modify the vertices array in hex.
+                    hex.center.x -= minX;
+                    hex.center.y -= minY;
                     hex.vertices.forEach(function(unused, i, vertices) {
                         vertices[i].x -= minX;
                         vertices[i].y -= minY;
                     });
 
                     drawHex(canvasLayers[0].ctx, hex.vertices);
+
+                    if (hex.unit) {
+                        drawUnit(canvasLayers[2].ctx,
+                                 hex.center.x,
+                                 hex.center.y,
+                                 (hex.unit.friendly ?
+                                  "#2088ff" :
+                                  "red"));
+                    }
                
                     // XXX: this is debugging, remove later
                     canvasLayers[1].ctx.font = "8px Courier New";
                     canvasLayers[1].ctx.fillStyle = "black";
                     canvasLayers[1].ctx.fillText(
                         q + ", " + r,
-                        hex.center.x - (viewportHexRadius / 2) - minX,
-                        hex.center.y - minY);
+                        hex.center.x - (viewportHexRadius / 2),
+                        hex.center.y);
                 });
             });
             redraw();
