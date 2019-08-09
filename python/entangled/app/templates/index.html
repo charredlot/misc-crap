@@ -17,8 +17,10 @@ var viewport;
 var viewportCtx;
 // the size of the hexes should be based on the visible viewport
 var viewportHexRadius;
+var viewportDX;
+var viewportDY;
 
-// this array of canvas elements hold the full grid, which might be bigger than
+// this array of canvas elements hold the full rgba(0, 0, 0, 0)grid, which might be bigger than
 // the viewport. all the layers have the same dimensions
 var canvasLayers;
 var margin = 20;
@@ -30,7 +32,16 @@ function redraw() {
     });
 }
 
-function setKeys() {
+function hexFromAxial(q, r) {
+    let rgrid = grid[q];
+    if (!rgrid) {
+        return;
+    }
+
+    return rgrid[r];
+}
+
+function setKeys(clickCanvas, hexRadius) {
     let keybinds = {};
     
     keybinds["w".charCodeAt(0)] = function() { cameraOffset.dy += 10; },
@@ -56,6 +67,51 @@ function setKeys() {
         }
 
     });
+
+    let clickHandler = function(event, erase) {
+        let x = (event.pageX
+                 - clickCanvas.offsetLeft
+                 - cameraOffset.dx
+                 + viewportDX);
+        let y = (event.pageY
+                 - clickCanvas.offsetTop
+                 - cameraOffset.dy
+                 + viewportDY);
+
+        // https://www.redblobgames.com/grids/hexagons/#pixel-to-hex
+        let q = Math.round(((x / sqrt3) - (y / 3)) / hexRadius);
+        let r = Math.round((y * 2 / 3) / hexRadius);
+
+        // thanks for not having integers javascript
+        if (Object.is(q, -0)) {
+            q = 0;
+        }
+
+        if (Object.is(r, -0)) {
+            r = 0;
+        }
+
+        let hex = grid[q][r];
+        if (!hex) {
+            return;
+        }
+
+        let vertices = hex.vertices;
+        let ctx = canvasLayers[1].ctx;
+        clearHex(ctx, vertices);
+        if (!erase) {
+            drawHex(ctx, vertices, "rgba(0, 39, 117, 0.3)");
+        }
+        redraw();
+    };
+
+    clickCanvas.addEventListener('click', function(event) {
+        clickHandler(event, false);
+    });
+    clickCanvas.addEventListener('dblclick', function(event) {
+        clickHandler(event, true);
+    });
+
 }
 
 function axialToPoint(q, r, radius) {
@@ -78,24 +134,37 @@ function hexVertices(centerX, centerY, radius) {
     ];
 }
 
-// ctx is a canvas 2D context
-// points is a list like [{x: x, y: y}, ...]
-// it should have 6 points
-function drawHex(ctx, points) {
+function drawHexPath(ctx, vertices) {
     ctx.beginPath();
-    let point = points[0];
-    ctx.moveTo(point.x, point.y);
-    for (let i = 1; i < points.length; i++) {
-        point = points[i];
-        ctx.lineTo(point.x, point.y);
+    let vertex = vertices[0];
+    ctx.moveTo(vertex.x, vertex.y);
+    for (let i = 1; i < vertices.length; i++) {
+        vertex = vertices[i];
+        ctx.lineTo(vertex.x, vertex.y);
     }
     ctx.closePath();
+}
 
-    ctx.fillStyle = "#00bb22";
+// ctx is a canvas 2D context
+// verticess is a list like [{x: x, y: y}, ...]
+// it should have 6 vertices
+function drawHex(ctx, vertices, fillStyle) {
+    drawHexPath(ctx, vertices);
+
+    ctx.fillStyle = fillStyle;
     ctx.fill();
 
     ctx.strokeStyle = "black";
     ctx.stroke();
+}
+
+function clearHex(ctx, vertices) {
+    let op = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'destination-out';
+    drawHexPath(ctx, vertices);
+    ctx.fillStyle = "black";
+    ctx.fill()
+    ctx.globalCompositeOperation = op;
 }
 
 function drawUnit(ctx, centerX, centerY, fillStyle) {
@@ -113,7 +182,7 @@ function initLayers(width, height) {
     console.log("grid dimensions:", width, height);
 
     canvasLayers = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
         let c = document.createElement("canvas");
         c.width = width;
         c.height = height;
@@ -129,8 +198,6 @@ function onLoad() {
     $.ajax({
         url: "/grid",
         success: function(result) {
-            setKeys();
-
             viewport = document.getElementById("theviewport");
             viewportCtx = viewport.getContext('2d');
             viewportHexRadius = viewport.height / 20;
@@ -176,6 +243,8 @@ function onLoad() {
 
             console.log("x range:", minX, maxX, "y range:", minY, maxY);
 
+            viewportDX = minX;
+            viewportDY = minY;
             initLayers(maxX - minX, maxY - minY);
 
             Object.getOwnPropertyNames(grid).forEach(function(q) {
@@ -193,10 +262,10 @@ function onLoad() {
                         vertices[i].y -= minY;
                     });
 
-                    drawHex(canvasLayers[0].ctx, hex.vertices);
+                    drawHex(canvasLayers[0].ctx, hex.vertices, "#00bb22");
 
                     if (hex.unit) {
-                        drawUnit(canvasLayers[2].ctx,
+                        drawUnit(canvasLayers[3].ctx,
                                  hex.center.x,
                                  hex.center.y,
                                  (hex.unit.friendly ?
@@ -205,14 +274,16 @@ function onLoad() {
                     }
                
                     // XXX: this is debugging, remove later
-                    canvasLayers[1].ctx.font = "8px Courier New";
-                    canvasLayers[1].ctx.fillStyle = "black";
-                    canvasLayers[1].ctx.fillText(
+                    canvasLayers[2].ctx.font = "8px Courier New";
+                    canvasLayers[2].ctx.fillStyle = "black";
+                    canvasLayers[2].ctx.fillText(
                         q + ", " + r,
                         hex.center.x - (viewportHexRadius / 2),
                         hex.center.y);
                 });
             });
+
+            setKeys(viewport, viewportHexRadius);
             redraw();
         }
     });
