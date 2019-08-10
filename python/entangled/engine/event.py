@@ -1,6 +1,17 @@
-from abc import ABC
+from abc import ABC, abstractmethod
+from typing import Iterable
 
 import heapq
+
+from engine.command import Command
+
+
+class CombatEventEffect(ABC):
+    """
+    For the UI to display what actually happened
+    """
+
+    pass
 
 
 class CombatEventBase(ABC):
@@ -12,6 +23,16 @@ class CombatEventBase(ABC):
         self.countdown = countdown
         self.priority = priority
 
+    @abstractmethod
+    def execute(self, combat) -> Iterable[CombatEventEffect]:
+        """
+        @param combat: type Combat, but avoid circular import for now
+        """
+        pass
+
+    def is_done(self) -> bool:
+        return True
+
     def __repr__(self):
         return "{}(countdown={}, priority={})".format(
             type(self), self.countdown, self.priority
@@ -19,7 +40,36 @@ class CombatEventBase(ABC):
 
 
 class CombatEvent(CombatEventBase):
-    pass
+    def execute(self, combat) -> Iterable[CombatEventEffect]:
+        return []
+
+
+class CommandableCombatEvent(CombatEventBase):
+    """
+    Represents a unit's turn that requires input commands.
+    """
+
+    def __init__(
+        self,
+        unit,
+        countdown: int,
+        priority: int = CombatEventBase.PRIORITY_MEDIUM,
+    ):
+        super(CommandableCombatEvent, self).__init__(countdown, priority)
+        self.unit = unit
+
+    @abstractmethod
+    def execute_command(
+        self, combat, command: Command
+    ) -> Iterable[CombatEventEffect]:
+        """
+        @param combat: type Combat, but avoid circular import for now
+        """
+        pass
+
+    def is_done(self) -> bool:
+        # execute_command should make this eventually return True
+        return False
 
 
 # using heapq makes changing the key value O(n) instead of O(log n) because the
