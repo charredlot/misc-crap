@@ -34,10 +34,7 @@ class TestCombatEventQueue(TestCase):
         self.assertEqual(popped, events[-1])
         events = events[:-1]
 
-        additional = [
-            CombatEvent(countdown=1),
-            CombatEvent(countdown=9),
-        ]
+        additional = [CombatEvent(countdown=1), CombatEvent(countdown=9)]
         q.push_all(additional)
 
         events += additional

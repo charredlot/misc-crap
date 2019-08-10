@@ -7,6 +7,7 @@ from level import hex_grid_json
 
 bp = Blueprint("argh", __name__, template_folder="templates")
 
+
 @bp.route("/")
 def index():
     return render_template("index.html")

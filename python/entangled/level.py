@@ -6,7 +6,8 @@ from functools import singledispatch
 
 AxialCoord = namedtuple("AxialCoord", ["q", "r"])
 
-class Unit():
+
+class Unit:
     PLAYER_CONTROL = 1
     CPU_CONTROL = 2
 
@@ -15,7 +16,7 @@ class Unit():
         self.control = control
 
 
-class HexTile():
+class HexTile:
     def __init__(self, coord: AxialCoord):
         self.coord = coord
         self.unit = None
@@ -27,7 +28,7 @@ class HexTile():
         return "(q={}, r={})".format(self.coord.q, self.coord.r)
 
 
-class HexGrid():
+class HexGrid:
     def __init__(self, coords=None):
         if not coords:
             self.tiles = dict()
@@ -55,23 +56,27 @@ def to_json(val):
 
 @to_json.register(Unit)
 def unit_json(unit):
-    return {"friendly": unit.friendly,
-            "control": unit.control}
+    return {"friendly": unit.friendly, "control": unit.control}
 
 
 @to_json.register(HexGrid)
 def hex_grid_json(grid):
-    return [{"q": coord.q,
-             "r": coord.r,
-             "unit": unit_json(tile.unit) if tile.unit else None}
-            for coord, tile in grid.tiles.items()]
+    return [
+        {
+            "q": coord.q,
+            "r": coord.r,
+            "unit": unit_json(tile.unit) if tile.unit else None,
+        }
+        for coord, tile in grid.tiles.items()
+    ]
 
 
 def coords_circle(center: AxialCoord, radius: int):
     # XXX: looping over cube coords, but there might be a better way
     for x in range(-radius, radius + 1):
         dq = x
-        for y in range(max(-radius, -x - radius),
-                       min(radius, -x + radius) + 1):
+        for y in range(
+            max(-radius, -x - radius), min(radius, -x + radius) + 1
+        ):
             dr = 0 - x - y
             yield AxialCoord(center.q + dq, center.r + dr)
