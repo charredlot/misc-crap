@@ -1,8 +1,5 @@
 DEBUG=1
 
-PYTESTS=tests/test_CombatEventQueue.py
-
-
 .PHONY: run
 run:
 	# . venv/bin/activate
