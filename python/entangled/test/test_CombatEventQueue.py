@@ -21,24 +21,22 @@ class TestCombatEventQueue(TestCase):
 
         self._test_order(q, sorted(events, key=lambda e: e.countdown))
 
-    def test_push_pop_push(self):
-        events = [
-            CombatEvent(countdown=3),
-            CombatEvent(countdown=2),
-            CombatEvent(countdown=1),
-        ]
+    def test_advance_time(self):
+        first = CombatEvent(countdown=2)
+        initial = [CombatEvent(countdown=3), CombatEvent(countdown=7)]
         q = CombatEventQueue()
-        q.push_all(events)
+        q.push_all(sample(initial, len(initial)))
 
+        q.push(first)
         popped = q.pop()
-        self.assertEqual(popped, events[-1])
-        events = events[:-1]
+        self.assertEqual(first, popped)
 
-        additional = [CombatEvent(countdown=1), CombatEvent(countdown=9)]
+        # popping time should make the starting point 2
+        additional = (CombatEvent(countdown=2), CombatEvent(countdown=3))
         q.push_all(additional)
 
-        events += additional
-        self._test_order(q, sorted(events, key=lambda e: e.countdown))
+        events = (initial[0], *additional, initial[-1])
+        self._test_order(q, events)
 
     def test_priority_secondary(self):
         ordered = (

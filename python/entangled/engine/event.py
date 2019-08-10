@@ -4,21 +4,17 @@ import heapq
 
 
 class CombatEventBase(ABC):
-    PRIORITY_LOW = 1
-    PRIORITY_MEDIUM = 2
-    PRIORITY_HIGH = 3
+    PRIORITY_LOW = 10
+    PRIORITY_MEDIUM = 20
+    PRIORITY_HIGH = 30
 
     def __init__(self, countdown: int, priority: int = PRIORITY_MEDIUM):
         self.countdown = countdown
         self.priority = priority
 
-    def min_heap_key(self):
-        # smallest countdown goes first, highest priority goes first
-        return (self.countdown, -self.priority)
-
     def __repr__(self):
-        return "CombatEvent(countdown={}, priority={})".format(
-            self.countdown, self.priority
+        return "{}(countdown={}, priority={})".format(
+            type(self), self.countdown, self.priority
         )
 
 
@@ -32,18 +28,16 @@ class CombatEventQueue:
     def __init__(self):
         self.events = []
         self.counter = 0
+        self.timestamp = 0
 
     def push(self, event: CombatEventBase):
-        # if heap_key is (a, b), then the real heap key becomes
-        # the tuple (a, b, counter, event) because python heapq is weird
+        # the heap key is (timestamp, priority, counter, event) because
+        # we can't do a custom comparator with python heapq
         # we use the counter to break ties so that insert order is preserved
+        timestamp = self.timestamp + event.countdown
+
         self.counter += 1
-        heap_key = event.min_heap_key()
-        try:
-            heap_item = (*heap_key, self.counter, event)
-        except TypeError:
-            # key is not a tuple
-            heap_item = (heap_key, self.counter, event)
+        heap_item = (timestamp, -event.priority, self.counter, event)
 
         heapq.heappush(self.events, heap_item)
 
@@ -52,6 +46,7 @@ class CombatEventQueue:
             self.push(event)
 
     def pop(self) -> CombatEventBase:
-        # event is always the last thing in the tuple
-        heap_item = heapq.heappop(self.events)
-        return heap_item[-1]
+        # timestamp moves on every pop event
+        timestamp, _, _, event = heapq.heappop(self.events)
+        self.timestamp = timestamp
+        return event
