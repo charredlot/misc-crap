@@ -12,3 +12,7 @@ test:
 .PHONY: format
 format:
 	black -l 79 -v --exclude venv/ ./
+
+.PHONY: lint
+lint:
+	flake8 --exclude=venv .

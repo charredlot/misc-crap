@@ -1,6 +1,6 @@
 import json
 
-from flask import Blueprint, current_app, g, render_template
+from flask import Blueprint, current_app, render_template
 
 from level import hex_grid_json
 

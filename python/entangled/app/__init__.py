@@ -1,4 +1,4 @@
-from flask import g, Flask
+from flask import Flask
 
 from app import routes
 from level import AxialCoord, HexGrid, Unit
