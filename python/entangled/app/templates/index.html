@@ -200,7 +200,7 @@ function onLoad() {
         success: function(result) {
             viewport = document.getElementById("theviewport");
             viewportCtx = viewport.getContext('2d');
-            viewportHexRadius = viewport.height / 20;
+            viewportHexRadius = viewport.height / 15;
 
             let minX = Infinity;
             let minY = Infinity;
@@ -274,7 +274,7 @@ function onLoad() {
                     }
                
                     // XXX: this is debugging, remove later
-                    canvasLayers[2].ctx.font = "8px Courier New";
+                    canvasLayers[2].ctx.font = "12px Courier New";
                     canvasLayers[2].ctx.fillStyle = "black";
                     canvasLayers[2].ctx.fillText(
                         q + ", " + r,
