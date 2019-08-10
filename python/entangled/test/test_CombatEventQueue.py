@@ -4,6 +4,11 @@ from unittest import TestCase
 from engine.event import CombatEvent, CombatEventQueue
 
 
+class CombatEventTest(CombatEvent):
+    def execute(self, combat):
+        return ()
+
+
 class TestCombatEventQueue(TestCase):
     def _test_order(self, q: CombatEventQueue, events_in_order):
         for expected in events_in_order:
@@ -12,9 +17,9 @@ class TestCombatEventQueue(TestCase):
 
     def test_push(self):
         events = (
-            CombatEvent(countdown=3),
-            CombatEvent(countdown=1),
-            CombatEvent(countdown=2),
+            CombatEventTest(countdown=3),
+            CombatEventTest(countdown=1),
+            CombatEventTest(countdown=2),
         )
         q = CombatEventQueue()
         q.push_all(events)
@@ -22,8 +27,8 @@ class TestCombatEventQueue(TestCase):
         self._test_order(q, sorted(events, key=lambda e: e.countdown))
 
     def test_advance_time(self):
-        first = CombatEvent(countdown=2)
-        initial = [CombatEvent(countdown=3), CombatEvent(countdown=7)]
+        first = CombatEventTest(countdown=2)
+        initial = [CombatEventTest(countdown=3), CombatEventTest(countdown=7)]
         q = CombatEventQueue()
         q.push_all(sample(initial, len(initial)))
 
@@ -32,7 +37,10 @@ class TestCombatEventQueue(TestCase):
         self.assertEqual(first, popped)
 
         # popping time should make the starting point 2
-        additional = (CombatEvent(countdown=2), CombatEvent(countdown=3))
+        additional = (
+            CombatEventTest(countdown=2),
+            CombatEventTest(countdown=3),
+        )
         q.push_all(additional)
 
         events = (initial[0], *additional, initial[-1])
@@ -40,9 +48,9 @@ class TestCombatEventQueue(TestCase):
 
     def test_priority_secondary(self):
         ordered = (
-            CombatEvent(countdown=1, priority=CombatEvent.PRIORITY_LOW),
-            CombatEvent(countdown=2, priority=CombatEvent.PRIORITY_HIGH),
-            CombatEvent(countdown=3),
+            CombatEventTest(countdown=1, priority=CombatEvent.PRIORITY_LOW),
+            CombatEventTest(countdown=2, priority=CombatEvent.PRIORITY_HIGH),
+            CombatEventTest(countdown=3),
         )
         q = CombatEventQueue()
         q.push_all(sample(ordered, len(ordered)))
@@ -51,10 +59,10 @@ class TestCombatEventQueue(TestCase):
 
     def test_priority_breaks_tie(self):
         ordered = (
-            CombatEvent(countdown=1, priority=CombatEvent.PRIORITY_HIGH),
-            CombatEvent(countdown=1, priority=CombatEvent.PRIORITY_MEDIUM),
-            CombatEvent(countdown=1, priority=CombatEvent.PRIORITY_LOW),
-            CombatEvent(countdown=1000),
+            CombatEventTest(countdown=1, priority=CombatEvent.PRIORITY_HIGH),
+            CombatEventTest(countdown=1, priority=CombatEvent.PRIORITY_MEDIUM),
+            CombatEventTest(countdown=1, priority=CombatEvent.PRIORITY_LOW),
+            CombatEventTest(countdown=1000),
         )
         q = CombatEventQueue()
         q.push_all(sample(ordered, len(ordered)))
@@ -64,12 +72,12 @@ class TestCombatEventQueue(TestCase):
     def test_stability(self):
         # order of insert should be preserved on pop
         ordered = (
-            CombatEvent(countdown=3, priority=CombatEvent.PRIORITY_MEDIUM),
-            CombatEvent(countdown=8, priority=CombatEvent.PRIORITY_HIGH),
-            CombatEvent(countdown=8, priority=CombatEvent.PRIORITY_HIGH),
-            CombatEvent(countdown=8, priority=CombatEvent.PRIORITY_HIGH),
-            CombatEvent(countdown=8, priority=CombatEvent.PRIORITY_HIGH),
-            CombatEvent(countdown=12, priority=CombatEvent.PRIORITY_LOW),
+            CombatEventTest(countdown=3, priority=CombatEvent.PRIORITY_MEDIUM),
+            CombatEventTest(countdown=8, priority=CombatEvent.PRIORITY_HIGH),
+            CombatEventTest(countdown=8, priority=CombatEvent.PRIORITY_HIGH),
+            CombatEventTest(countdown=8, priority=CombatEvent.PRIORITY_HIGH),
+            CombatEventTest(countdown=8, priority=CombatEvent.PRIORITY_HIGH),
+            CombatEventTest(countdown=12, priority=CombatEvent.PRIORITY_LOW),
         )
         q = CombatEventQueue()
         q.push_all(ordered)

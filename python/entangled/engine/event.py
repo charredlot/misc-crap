@@ -14,7 +14,7 @@ class CombatEventEffect(ABC):
     pass
 
 
-class CombatEventBase(ABC):
+class CombatEvent(ABC):
     PRIORITY_LOW = 10
     PRIORITY_MEDIUM = 20
     PRIORITY_HIGH = 30
@@ -39,21 +39,13 @@ class CombatEventBase(ABC):
         )
 
 
-class CombatEvent(CombatEventBase):
-    def execute(self, combat) -> Iterable[CombatEventEffect]:
-        return []
-
-
-class CommandableCombatEvent(CombatEventBase):
+class CommandableCombatEvent(CombatEvent):
     """
     Represents a unit's turn that requires input commands.
     """
 
     def __init__(
-        self,
-        unit,
-        countdown: int,
-        priority: int = CombatEventBase.PRIORITY_MEDIUM,
+        self, unit, countdown: int, priority: int = CombatEvent.PRIORITY_MEDIUM
     ):
         super(CommandableCombatEvent, self).__init__(countdown, priority)
         self.unit = unit
@@ -80,7 +72,7 @@ class CombatEventQueue:
         self.counter = 0
         self.timestamp = 0
 
-    def push(self, event: CombatEventBase):
+    def push(self, event: CombatEvent):
         # the heap key is (timestamp, priority, counter, event) because
         # we can't do a custom comparator with python heapq
         # we use the counter to break ties so that insert order is preserved
@@ -95,7 +87,7 @@ class CombatEventQueue:
         for event in events:
             self.push(event)
 
-    def pop(self) -> CombatEventBase:
+    def pop(self) -> CombatEvent:
         # timestamp moves on every pop event
         timestamp, _, _, event = heapq.heappop(self.events)
         self.timestamp = timestamp

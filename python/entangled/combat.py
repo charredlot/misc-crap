@@ -4,7 +4,7 @@ import logging
 
 from engine.command import Command
 from engine.event import (
-    CombatEventBase,
+    CombatEvent,
     CombatEventEffect,
     CombatEventQueue,
     CommandableCombatEvent,
@@ -22,7 +22,7 @@ class Combat:
         self.debug = debug if debug else CombatDebug()
 
         self.event_queue = CombatEventQueue()
-        self.curr_event: Optional[CombatEventBase] = None
+        self.curr_event: Optional[CombatEvent] = None
 
     def step(self) -> Iterable[CombatEventEffect]:
         if self.curr_event and not self.curr_event.is_done():
