@@ -16,3 +16,4 @@ format:
 .PHONY: lint
 lint:
 	flake8 --exclude=venv .
+	mypy --warn-unreachable .
