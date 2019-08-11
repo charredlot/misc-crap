@@ -42,7 +42,7 @@ function hexFromAxial(q, r) {
 
 function setKeys(clickCanvas, hexRadius) {
     let keybinds = {};
-    
+
     keybinds["w".charCodeAt(0)] = function() { cameraOffset.dy += 10; },
     keybinds["a".charCodeAt(0)] = function() { cameraOffset.dx += 10; },
     keybinds["s".charCodeAt(0)] = function() { cameraOffset.dy -= 10; },
@@ -51,7 +51,7 @@ function setKeys(clickCanvas, hexRadius) {
 
     $(window).on("keypress", function(evt) {
         let f = keybinds[evt.keyCode];
-        
+
         if (f === undefined) {
             return;
         }
