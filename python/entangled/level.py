@@ -1,8 +1,6 @@
-import json
-
 from collections import namedtuple
-from functools import singledispatch
 
+from util import to_json
 
 AxialCoord = namedtuple("AxialCoord", ["q", "r"])
 
@@ -47,11 +45,6 @@ class HexGrid:
 
     def __repr__(self):
         return "\n".join(str(coord) for coord in self.tiles.keys())
-
-
-@singledispatch
-def to_json(val):
-    return json.dumps(val)
 
 
 @to_json.register(Unit)
