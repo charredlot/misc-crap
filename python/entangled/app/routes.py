@@ -2,7 +2,7 @@ import json
 
 from flask import Blueprint, current_app, render_template
 
-from level import hex_grid_json
+from combat import combat_json
 
 
 bp = Blueprint("argh", __name__, template_folder="templates")
@@ -13,6 +13,6 @@ def index():
     return render_template("index.html")
 
 
-@bp.route("/grid")
-def grid():
-    return json.dumps(current_app.currentGrid, default=hex_grid_json, indent=2)
+@bp.route("/combat_state")
+def combat_state():
+    return json.dumps(current_app.combat, default=combat_json, indent=2)

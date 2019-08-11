@@ -5,8 +5,7 @@
 
         <script>
 "use strict";
-var grid = {};
-var tiles;
+var combat;
 var center = {x: 0, y: 0};
 var cameraOffset = {dx: 0, dy: 0};
 var sqrt3 = Math.sqrt(3);
@@ -20,8 +19,8 @@ var viewportHexRadius;
 var viewportDX;
 var viewportDY;
 
-// this array of canvas elements hold the full rgba(0, 0, 0, 0)grid, which might be bigger than
-// the viewport. all the layers have the same dimensions
+// this array of canvas elements hold the full grid which might be bigger
+// than the viewport. all the layers have the same dimensions
 var canvasLayers;
 var margin = 20;
 
@@ -33,7 +32,7 @@ function redraw() {
 }
 
 function hexFromAxial(q, r) {
-    let rgrid = grid[q];
+    let rgrid = combat.grid[q];
     if (!rgrid) {
         return;
     }
@@ -91,7 +90,7 @@ function setKeys(clickCanvas, hexRadius) {
             r = 0;
         }
 
-        let hex = grid[q][r];
+        let hex = hexFromAxial(q, r);
         if (!hex) {
             return;
         }
@@ -196,7 +195,7 @@ function initLayers(width, height) {
 
 function onLoad() {
     $.ajax({
-        url: "/grid",
+        url: "/combat_state",
         success: function(result) {
             viewport = document.getElementById("theviewport");
             viewportCtx = viewport.getContext('2d');
@@ -211,8 +210,9 @@ function onLoad() {
             // entire grid. though the size of the grid is scaled to the
             // viewport. the viewport will just use an offset to figure out
             // which part of the grid is currently visible
-            tiles = JSON.parse(result);
-            tiles.forEach(function(tile) {
+            let grid = {};
+            combat = JSON.parse(result);
+            combat.tiles.forEach(function(tile) {
                 let hex = {};
 
                 if (grid[tile.q] === undefined) {
@@ -224,8 +224,8 @@ function onLoad() {
                 hex.vertices = hexVertices(hex.center.x, hex.center.y,
                                            viewportHexRadius);
 
-                if (tile.unit) {
-                    hex.unit = tile.unit;
+                if (tile.unit_name) {
+                    hex.unit = combat.units[tile.unit_name];
                 }
 
                 hex.vertices.forEach(function(vertex) {
@@ -235,6 +235,7 @@ function onLoad() {
                     maxY = Math.max(maxY, vertex.y);
                 });
             });
+            combat.grid = grid;
 
             minX -= margin;
             maxX += margin;
@@ -247,10 +248,10 @@ function onLoad() {
             viewportDY = minY;
             initLayers(maxX - minX, maxY - minY);
 
-            Object.getOwnPropertyNames(grid).forEach(function(q) {
-                let rgrid = grid[q];
+            Object.getOwnPropertyNames(combat.grid).forEach(function(q) {
+                let rgrid = combat.grid[q];
                 Object.getOwnPropertyNames(rgrid).forEach(function (r) {
-                    let hex = grid[q][r];
+                    let hex = combat.grid[q][r];
 
                     // offset everything so the top left of the grid matches
                     // the top left of grid's canvas. we want to actually
@@ -272,7 +273,7 @@ function onLoad() {
                                   "#2088ff" :
                                   "red"));
                     }
-               
+
                     // XXX: this is debugging, remove later
                     canvasLayers[2].ctx.font = "12px Courier New";
                     canvasLayers[2].ctx.fillStyle = "black";

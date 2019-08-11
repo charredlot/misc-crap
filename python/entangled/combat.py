@@ -1,4 +1,4 @@
-from typing import Iterable, Optional
+from typing import Dict, Iterable, Optional
 
 import logging
 
@@ -9,7 +9,9 @@ from engine.event import (
     CombatEventQueue,
     CommandableCombatEvent,
 )
-from level import HexGrid
+from level import AxialCoord, HexGrid
+from unit import Unit, unit_json
+from util import to_json
 
 
 class CombatDebug:
@@ -23,6 +25,8 @@ class Combat:
 
         self.event_queue = CombatEventQueue()
         self.curr_event: Optional[CombatEvent] = None
+
+        self.units: Dict[str, Unit] = {}
 
     def step(self) -> Iterable[CombatEventEffect]:
         if self.curr_event and not self.curr_event.is_done():
@@ -50,3 +54,25 @@ class Combat:
             return ()
 
         return self.curr_event.execute_command(self, command)
+
+    def place_unit(self, unit: Unit, coord: AxialCoord):
+        tile = self.grid.tiles[coord]
+        tile.unit = unit
+        self.units[unit.name] = unit
+
+
+@to_json.register(Combat)
+def combat_json(combat):
+    return {
+        "units": {
+            name: unit_json(unit) for name, unit in combat.units.items()
+        },
+        "tiles": [
+            {
+                "q": coord.q,
+                "r": coord.r,
+                "unit_name": tile.unit.name if tile.unit else None,
+            }
+            for coord, tile in combat.grid.tiles.items()
+        ],
+    }
