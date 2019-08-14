@@ -3,6 +3,10 @@ from collections import namedtuple
 
 AxialCoord = namedtuple("AxialCoord", ["q", "r"])
 
+AXIAL_NEIGHBORS = frozenset(
+    ((0, -1), (1, -1), (1, 0), (0, 1), (-1, 1), (-1, 0))
+)
+
 
 class HexTile:
     def __init__(self, coord: AxialCoord):
@@ -46,3 +50,9 @@ def coords_circle(center: AxialCoord, radius: int):
         ):
             dr = 0 - x - y
             yield AxialCoord(center.q + dq, center.r + dr)
+
+
+def are_coords_adjacent(a: AxialCoord, b: AxialCoord):
+    dx = b.q - a.q
+    dy = b.r - a.r
+    return (dx, dy) in AXIAL_NEIGHBORS
