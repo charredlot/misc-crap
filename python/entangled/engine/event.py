@@ -30,6 +30,14 @@ class CombatEvent(ABC):
         """
         pass
 
+    def affected_units(self):
+        """
+        Mostly for the UI to display things
+
+        @returns: an iterable of Unit that are affected by the events
+        """
+        return ()
+
     def is_done(self) -> bool:
         return True
 
@@ -92,3 +100,10 @@ class CombatEventQueue:
         timestamp, _, _, event = heapq.heappop(self.events)
         self.timestamp = timestamp
         return event
+
+    def __iter__(self):
+        # make copy of list
+        events = list(self.events)
+        while events:
+            t = heapq.heappop(events)
+            yield t[-1]

@@ -1,0 +1,49 @@
+#unit-info {
+    border: 1px solid;
+}
+
+#theviewport {
+    border: 1px solid;
+}
+
+#canvas-row {
+    display: flex;
+    flex-direction: row;
+}
+
+#event-queue-column {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid;
+    padding: 5px;
+}
+
+#event-queue {
+    display: flex;
+    flex-direction: column;
+}
+
+#event-queue div:first-child {
+    background: #ff9b54;
+    color: white;
+    margin-left: 0;
+    border: 5px double;
+}
+
+#event-queue div:nth-child(odd) {
+    background: #ff9b54;
+    color: white;
+}
+
+#event-queue div:nth-child(even) {
+    background: #2a51fa;
+    color: white;
+}
+
+#event-template {
+    display: none;
+    margin: 1px;
+    margin-left: 15px;
+    border-radius: 10px;
+    padding: 5px;
+}

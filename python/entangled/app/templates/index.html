@@ -1,6 +1,8 @@
 <html>
 
     <head>
+        <link rel="stylesheet" href="/static/index.css?nocache={{ time }}">
+
         <script src="/static/jquery.3.4.1.min.js"></script>
 
         <script>
@@ -23,6 +25,9 @@ var viewportDY;
 // than the viewport. all the layers have the same dimensions
 var canvasLayers;
 var margin = 20;
+
+var domEventQueue;
+var domEventTemplate;
 
 function redraw() {
     viewportCtx.clearRect(0, 0, viewport.width, viewport.height);
@@ -193,14 +198,32 @@ function initLayers(width, height) {
     }
 }
 
+function redrawEventQueue(events) {
+    domEventQueue.empty();
+    events.forEach(function(evt) {
+        let newElem = domEventTemplate.clone();
+        let eventText = "Countdown " + evt.countdown;
+        if (evt.units.length > 0) {
+            eventText += " " + evt.units.join(",");
+        }
+
+        newElem.text(eventText);
+        domEventQueue.append(newElem);
+        newElem.show();
+    });
+}
+
 function onLoad() {
+    viewport = document.getElementById("theviewport");
+    viewportCtx = viewport.getContext('2d');
+    viewportHexRadius = viewport.height / 15;
+
+    domEventQueue = $("#event-queue");
+    domEventTemplate = $("#event-template");
+
     $.ajax({
         url: "/combat_state",
         success: function(result) {
-            viewport = document.getElementById("theviewport");
-            viewportCtx = viewport.getContext('2d');
-            viewportHexRadius = viewport.height / 15;
-
             let minX = Infinity;
             let minY = Infinity;
             let maxX = -Infinity;
@@ -286,6 +309,8 @@ function onLoad() {
 
             setKeys(viewport, viewportHexRadius);
             redraw();
+
+            redrawEventQueue(combat.events);
         }
     });
 }
@@ -297,7 +322,23 @@ $( window ).on("load", onLoad);
 
     <body>
         <h1>boop</h1>
-        <canvas id="theviewport" width=800 height=600>
-        </canvas>
+        <div id="unit-info">
+            <div id="unit-info-name">
+                &nbsp;
+            </div>
+            <div id="unit-info-action-points">
+                &nbsp;
+            </div>
+        </div>
+        <div id="canvas-row">
+            <canvas id="theviewport" width=800 height=600>
+            </canvas>
+            <div id="event-queue-column">
+                <h2>Next:</h2>
+                <div id="event-queue">
+                    <div id="event-template"></div>
+                </div>
+            </div>
+        </div>
     </body>
 </html>

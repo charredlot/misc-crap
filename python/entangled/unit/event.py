@@ -33,6 +33,9 @@ class UnitTurnCombatEvent(CommandableCombatEvent):
     ) -> Iterable[CombatEventEffect]:
         return ()
 
+    def affected_units(self):
+        return (self.unit,)
+
     def is_done(self):
         return False
 

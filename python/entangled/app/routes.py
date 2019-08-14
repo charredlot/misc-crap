@@ -1,4 +1,5 @@
 import json
+import time
 
 from flask import Blueprint, current_app, render_template
 
@@ -10,7 +11,7 @@ bp = Blueprint("argh", __name__, template_folder="templates")
 
 @bp.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", time=time.time())
 
 
 @bp.route("/combat_state")

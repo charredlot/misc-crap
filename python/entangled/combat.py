@@ -86,4 +86,11 @@ def combat_json(combat):
             }
             for coord, tile in combat.grid.tiles.items()
         ],
+        "events": [
+            {
+                "countdown": e.countdown,
+                "units": [unit.name for unit in e.affected_units()],
+            }
+            for e in combat.event_queue
+        ],
     }
