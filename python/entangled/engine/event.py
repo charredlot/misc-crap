@@ -35,7 +35,7 @@ class CombatEvent(ABC):
 
     def __repr__(self):
         return "{}(countdown={}, priority={})".format(
-            type(self), self.countdown, self.priority
+            type(self).__name__, self.countdown, self.priority
         )
 
 

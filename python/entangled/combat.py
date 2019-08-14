@@ -11,6 +11,7 @@ from engine.event import (
 )
 from level import AxialCoord, HexGrid
 from unit import Unit, unit_json
+from unit.event import UnitTurnCombatEvent
 from util import to_json
 
 
@@ -34,7 +35,7 @@ class Combat:
 
         event = self.event_queue.pop()
         if self.debug.print_events:
-            logging.info(event)
+            logging.info("Pop and execute event: %s", event)
 
         effects = event.execute(self)
 
@@ -56,9 +57,19 @@ class Combat:
         return self.curr_event.execute_command(self, command)
 
     def place_unit(self, unit: Unit, coord: AxialCoord):
+        self.units[unit.name] = unit
+
         tile = self.grid.tiles[coord]
         tile.unit = unit
-        self.units[unit.name] = unit
+        unit.tile = tile
+
+        self.push_event(UnitTurnCombatEvent(unit))
+
+    def push_event(self, event: CombatEvent):
+        if self.debug.print_events:
+            logging.info("Push event: %s", event)
+
+        self.event_queue.push(event)
 
 
 @to_json.register(Combat)
