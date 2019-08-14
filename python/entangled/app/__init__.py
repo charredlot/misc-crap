@@ -1,3 +1,5 @@
+import logging
+
 from flask import Flask
 
 from app import routes
@@ -7,7 +9,10 @@ from unit import Unit
 
 
 def create_app(test_config=None):
+    logging.basicConfig(level=logging.INFO)
+
     app = Flask(__name__, instance_relative_config=True)
+    app.logger.setLevel(logging.INFO)
 
     grid = HexGrid(
         (
