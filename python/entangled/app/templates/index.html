@@ -35,6 +35,8 @@ var LAYER_UNIT = 3;
 
 var domEventQueue;
 var domEventTemplate;
+var domSelectedHexInfoText;
+var domSelectedUnitName;
 
 function redraw() {
     viewportCtx.clearRect(0, 0, viewport.width, viewport.height);
@@ -50,6 +52,35 @@ function hexFromAxial(q, r) {
     }
 
     return rgrid[r];
+}
+
+function selectHex(hex) {
+    if (!hex) {
+        return;
+    }
+
+    let oldHex = ui.hex;
+    let ctx = canvasLayers[LAYER_GRID_SELECT].ctx;
+
+    if (oldHex) {
+        if ((oldHex.q === hex.q) && (oldHex.r === hex.r)) {
+            return;
+        }
+        clearHex(ctx, oldHex.vertices);
+    }
+
+    drawHex(ctx, hex.vertices, "rgba(0, 39, 117, 0.3)");
+
+    domSelectedHexInfoText.text("Q: " + hex.q + " R: " + hex.r);
+    if (hex.unit) {
+        domSelectedUnitName.text(hex.unit.name);
+    }
+    else {
+        domSelectedUnitName.text("")
+    }
+
+    redraw();
+    ui.hex = hex;
 }
 
 function clickToHex(evt) {
@@ -107,25 +138,7 @@ function setKeys(clickCanvas, hexRadius) {
 
 
     clickCanvas.addEventListener('click', function(event) {
-        let hex = clickToHex(event);
-        if (!hex) {
-            return;
-        }
-
-        let oldHex = ui.hex;
-        let ctx = canvasLayers[LAYER_GRID_SELECT].ctx;
-
-        if (oldHex) {
-            if ((oldHex.q === hex.q) && (oldHex.r === hex.r)) {
-                return;
-            }
-            clearHex(ctx, oldHex.vertices);
-        }
-
-        drawHex(ctx, hex.vertices, "rgba(0, 39, 117, 0.3)");
-        redraw();
-
-        ui.hex = hex;
+        selectHex(clickToHex(event));
     });
 }
 
@@ -234,6 +247,8 @@ function onLoad() {
 
     domEventQueue = $("#event-queue");
     domEventTemplate = $("#event-template");
+    domSelectedHexInfoText = $("#selected-hex-info-text");
+    domSelectedUnitName = $("#selected-unit-name");
 
     $.ajax({
         url: "/combat_state",
@@ -351,7 +366,6 @@ $( window ).on("load", onLoad);
     <head>
 
     <body>
-        <h1>boop</h1>
         <div id="all">
             <div id="canvas-column">
                 <div id="selected-info">
@@ -359,7 +373,7 @@ $( window ).on("load", onLoad);
                         <span id="selected-hex-info-text">&nbsp;</span>
                     </div>
                     <div id="selected-unit-info">
-                        &nbsp;
+                        <span id="selected-unit-name">&nbsp;</span>
                     </div>
                 </div>
 
