@@ -246,6 +246,8 @@ function onLoad() {
                 }
                 grid[tile.q][tile.r] = hex;
 
+                hex.q = tile.q;
+                hex.r = tile.r;
                 hex.center = axialToPoint(tile.q, tile.r, viewportHexRadius);
                 hex.vertices = hexVertices(hex.center.x, hex.center.y,
                                            viewportHexRadius);
