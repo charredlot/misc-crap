@@ -30,6 +30,9 @@ class Combat:
 
         self.units: Dict[str, Unit] = {}
 
+        self.unit_key_to_coord: Dict[str, AxialCoord] = {}
+        self.coord_to_unit_key: Dict[AxialCoord, str] = {}
+
     def step(self) -> Tuple[CombatEvent, Iterable[CombatEventEffect]]:
         if self.curr_event and not self.curr_event.is_done():
             raise Exception("{} needs commands".format(self.curr_event))
@@ -58,11 +61,25 @@ class Combat:
         return self.curr_event.execute_command(self, command)
 
     def place_unit(self, unit: Unit, coord: AxialCoord):
-        self.units[unit.key()] = unit
+        unit_key = unit.key()
+        self.units[unit_key] = unit
 
-        tile = self.grid.tiles[coord]
-        tile.unit = unit
-        unit.tile = tile
+        if unit_key in self.unit_key_to_coord:
+            raise Exception(
+                "unit {} is already at {}".format(
+                    unit_key, self.unit_key_to_coord[unit_key]
+                )
+            )
+
+        if coord in self.coord_to_unit_key:
+            raise Exception(
+                "another unit {} already at {}".format(
+                    self.coord_to_unit_key[coord], coord
+                )
+            )
+
+        self.unit_key_to_coord[unit_key] = coord
+        self.coord_to_unit_key[coord] = unit_key
 
         self.push_event(UnitTurnCombatEvent(unit))
 
@@ -81,9 +98,15 @@ def combat_json(combat):
             {
                 "q": coord.q,
                 "r": coord.r,
-                "unit_key": tile.unit.key() if tile.unit else None,
+                "unit_key": combat.coord_to_unit_key[coord]
+                if coord in combat.coord_to_unit_key
+                else None,
             }
             for coord, tile in combat.grid.tiles.items()
         ],
+        "unit_key_to_coord": {
+            unit_key: {"q": coord.q, "r": coord.r}
+            for unit_key, coord in combat.unit_key_to_coord.items()
+        },
         "events": [event_json(e) for e in combat.event_queue],
     }

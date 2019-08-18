@@ -11,7 +11,6 @@ AXIAL_NEIGHBORS = frozenset(
 class HexTile:
     def __init__(self, coord: AxialCoord):
         self.coord = coord
-        self.unit = None
 
     def __hash__(self):
         return hash(self.coord)

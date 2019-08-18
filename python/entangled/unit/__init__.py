@@ -1,6 +1,3 @@
-from typing import Optional
-
-from level import HexTile
 from util import to_json
 
 
@@ -21,13 +18,12 @@ class Unit:
         self.action_points = action_points
         self.friendly = friendly
         self.control = control
-        self.tile: Optional[HexTile] = None
 
     def key(self):
         return self.name
 
     def __repr__(self):
-        return "Unit({}, tile={})".format(self.name, self.tile)
+        return "Unit({})".format(self.name)
 
 
 @to_json.register(Unit)
