@@ -45,6 +45,32 @@ function hexFromAxial(q, r) {
     return rgrid[r];
 }
 
+function clickToHex(evt) {
+    let x = (evt.pageX
+             - viewport.offsetLeft
+             - cameraOffset.dx
+             + viewportDX);
+    let y = (evt.pageY
+             - viewport.offsetTop
+             - cameraOffset.dy
+             + viewportDY);
+
+    // https://www.redblobgames.com/grids/hexagons/#pixel-to-hex
+    let q = Math.round(((x / sqrt3) - (y / 3)) / viewportHexRadius);
+    let r = Math.round((y * 2 / 3) / viewportHexRadius);
+
+    // thanks for not having integers javascript
+    if (Object.is(q, -0)) {
+        q = 0;
+    }
+
+    if (Object.is(r, -0)) {
+        r = 0;
+    }
+
+    return hexFromAxial(q, r);
+}
+
 function setKeys(clickCanvas, hexRadius) {
     let keybinds = {};
 
@@ -73,33 +99,7 @@ function setKeys(clickCanvas, hexRadius) {
     });
 
     let clickHandler = function(event, erase) {
-        let x = (event.pageX
-                 - clickCanvas.offsetLeft
-                 - cameraOffset.dx
-                 + viewportDX);
-        let y = (event.pageY
-                 - clickCanvas.offsetTop
-                 - cameraOffset.dy
-                 + viewportDY);
-
-        // https://www.redblobgames.com/grids/hexagons/#pixel-to-hex
-        let q = Math.round(((x / sqrt3) - (y / 3)) / hexRadius);
-        let r = Math.round((y * 2 / 3) / hexRadius);
-
-        // thanks for not having integers javascript
-        if (Object.is(q, -0)) {
-            q = 0;
-        }
-
-        if (Object.is(r, -0)) {
-            r = 0;
-        }
-
-        let hex = hexFromAxial(q, r);
-        if (!hex) {
-            return;
-        }
-
+        let hex = clickToHex(event);
         let vertices = hex.vertices;
         let ctx = canvasLayers[1].ctx;
         clearHex(ctx, vertices);
