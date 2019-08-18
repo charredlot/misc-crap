@@ -3,6 +3,7 @@ import time
 
 from flask import Blueprint, current_app, render_template
 
+from app.game import get_combat
 from combat import combat_json
 from engine.event import effect_json, event_json
 
@@ -17,6 +18,7 @@ def index():
 
 @bp.route("/combat_state")
 def combat_state():
+    current_app.combat = get_combat()
     return json.dumps(current_app.combat, default=combat_json, indent=2)
 
 
