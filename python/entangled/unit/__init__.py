@@ -23,6 +23,9 @@ class Unit:
         self.control = control
         self.tile: Optional[HexTile] = None
 
+    def key(self):
+        return self.name
+
     def __repr__(self):
         return "Unit({}, tile={})".format(self.name, self.tile)
 

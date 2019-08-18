@@ -57,7 +57,7 @@ class Combat:
         return self.curr_event.execute_command(self, command)
 
     def place_unit(self, unit: Unit, coord: AxialCoord):
-        self.units[unit.name] = unit
+        self.units[unit.key()] = unit
 
         tile = self.grid.tiles[coord]
         tile.unit = unit
@@ -75,21 +75,19 @@ class Combat:
 @to_json.register(Combat)
 def combat_json(combat):
     return {
-        "units": {
-            name: unit_json(unit) for name, unit in combat.units.items()
-        },
+        "units": {key: unit_json(unit) for key, unit in combat.units.items()},
         "tiles": [
             {
                 "q": coord.q,
                 "r": coord.r,
-                "unit_name": tile.unit.name if tile.unit else None,
+                "unit_key": tile.unit.key() if tile.unit else None,
             }
             for coord, tile in combat.grid.tiles.items()
         ],
         "events": [
             {
                 "countdown": e.countdown,
-                "units": [unit.name for unit in e.affected_units()],
+                "unit_keys": [unit.key() for unit in e.affected_units()],
             }
             for e in combat.event_queue
         ],

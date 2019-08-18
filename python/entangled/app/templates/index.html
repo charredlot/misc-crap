@@ -203,8 +203,8 @@ function redrawEventQueue(events) {
     events.forEach(function(evt) {
         let newElem = domEventTemplate.clone();
         let eventText = "Countdown " + evt.countdown;
-        if (evt.units.length > 0) {
-            eventText += " " + evt.units.join(",");
+        if (evt.unit_keys.length > 0) {
+            eventText += " " + evt.unit_keys.join(",");
         }
 
         newElem.text(eventText);
@@ -247,8 +247,8 @@ function onLoad() {
                 hex.vertices = hexVertices(hex.center.x, hex.center.y,
                                            viewportHexRadius);
 
-                if (tile.unit_name) {
-                    hex.unit = combat.units[tile.unit_name];
+                if (tile.unit_key) {
+                    hex.unit = combat.units[tile.unit_key];
                 }
 
                 hex.vertices.forEach(function(vertex) {
