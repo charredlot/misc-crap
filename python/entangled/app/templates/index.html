@@ -240,6 +240,36 @@ function redrawEventQueue(currEvent, events) {
     events.forEach(appendEvent);
 }
 
+function handleEffect(effect) {
+    // this is probably going to be ugly
+    switch (effect.key) {
+        case "UnitTurnBeganEffect":
+            let coord = combat.unit_key_to_coord[effect.unit_key];
+            selectHex(combat.grid[coord.q][coord.r]);
+            break;
+    }
+}
+
+function handleCombatStep(step_result) {
+    let step = JSON.parse(step_result);
+
+    console.log("step:", step);
+
+    step.effects.forEach(function(effect) {
+        handleEffect(effect);
+    });
+
+    // TODO: handle redrawing grid and unit changes
+    redrawEventQueue(step.curr_event, step.events);
+}
+
+function combatStep() {
+    $.ajax({
+        url: "/combat_step",
+        success: handleCombatStep,
+    });
+}
+
 function onLoad() {
     viewport = document.getElementById("theviewport");
     viewportCtx = viewport.getContext('2d');
@@ -347,15 +377,7 @@ function onLoad() {
             redrawEventQueue(combat.events[0], combat.events.slice(1));
 
             // once it's setup, progress the game
-            $.ajax({
-                url: "/combat_step",
-                success: function(step_result) {
-                    let step = JSON.parse(step_result);
-
-                    console.log("step:", step);
-                    redrawEventQueue(step.curr_event, step.events);
-                },
-            });
+            combatStep();
         }
     });
 }
