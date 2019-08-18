@@ -1,18 +1,59 @@
+body {
+    background-color: #292929;
+    color: white;
+}
+
+#all {
+    display: flex;
+    flex-direction: row;
+    width: 1000px;
+}
+
+#canvas-column {
+    display: flex;
+    flex-direction: column;
+}
+
+#selected-info {
+    display: flex;
+    flex-direction: column;
+}
+
+#selected-hex-info {
+    background: #2a51fa;
+    border: 1px solid;
+    border-radius: 5px;
+    height: 2em;
+    padding: 5px;
+
+    display: flex;
+    align-items: center;
+}
+
+#selected-unit-info {
+    background: #ff9b54;
+    border: 1px solid;
+    border-radius: 5px;
+    height: 5em;
+    padding: 5px;
+}
+
 #unit-info {
     border: 1px solid;
+    border-radius: 5px;
+    background: #2a51fa;
+    height: 5em;
 }
 
 #theviewport {
     border: 1px solid;
 }
 
-#canvas-row {
-    display: flex;
-    flex-direction: row;
-}
-
 #event-queue-column {
+    background: #ea80ff;
+    border-radius: 5px;
     display: flex;
+    flex: auto;
     flex-direction: column;
     border: 1px solid;
     padding: 5px;
@@ -25,25 +66,23 @@
 
 #event-queue div:first-child {
     background: #ff9b54;
-    color: white;
     margin-left: 0;
     border: 5px double;
 }
 
 #event-queue div:nth-child(odd) {
     background: #ff9b54;
-    color: white;
 }
 
 #event-queue div:nth-child(even) {
     background: #2a51fa;
-    color: white;
 }
 
 #event-template {
+    border: 1px solid white;
+    border-radius: 10px;
     display: none;
     margin: 1px;
     margin-left: 15px;
-    border-radius: 10px;
     padding: 5px;
 }

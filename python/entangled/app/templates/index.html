@@ -352,17 +352,28 @@ $( window ).on("load", onLoad);
 
     <body>
         <h1>boop</h1>
-        <div id="unit-info">
-            <div id="unit-info-name">
-                &nbsp;
+        <div id="all">
+            <div id="canvas-column">
+                <div id="selected-info">
+                    <div id="selected-hex-info">
+                        <span id="selected-hex-info-text">&nbsp;</span>
+                    </div>
+                    <div id="selected-unit-info">
+                        &nbsp;
+                    </div>
+                </div>
+
+                <canvas id="theviewport" width=800 height=600></canvas>
+
+                <div id="unit-info">
+                    <div id="unit-info-name">
+                        &nbsp;
+                    </div>
+                    <div id="unit-info-action-points">
+                        &nbsp;
+                    </div>
+                </div>
             </div>
-            <div id="unit-info-action-points">
-                &nbsp;
-            </div>
-        </div>
-        <div id="canvas-row">
-            <canvas id="theviewport" width=800 height=600>
-            </canvas>
             <div id="event-queue-column">
                 <h2>Next:</h2>
                 <div id="event-queue">
