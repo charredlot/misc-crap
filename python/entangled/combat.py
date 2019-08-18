@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, Optional, Tuple
 
 import logging
 
@@ -8,6 +8,7 @@ from engine.event import (
     CombatEventEffect,
     CombatEventQueue,
     CommandableCombatEvent,
+    event_json,
 )
 from level import AxialCoord, HexGrid
 from unit import Unit, unit_json
@@ -29,7 +30,7 @@ class Combat:
 
         self.units: Dict[str, Unit] = {}
 
-    def step(self) -> Iterable[CombatEventEffect]:
+    def step(self) -> Tuple[CombatEvent, Iterable[CombatEventEffect]]:
         if self.curr_event and not self.curr_event.is_done():
             raise Exception("{} needs commands".format(self.curr_event))
 
@@ -40,7 +41,7 @@ class Combat:
         effects = event.execute(self)
 
         self.curr_event = event
-        return effects
+        return event, effects
 
     def process_command(self, command: Command) -> Iterable[CombatEventEffect]:
         # XXX: this needs to be single-threaded with step, add lock later
@@ -84,11 +85,5 @@ def combat_json(combat):
             }
             for coord, tile in combat.grid.tiles.items()
         ],
-        "events": [
-            {
-                "countdown": e.countdown,
-                "unit_keys": [unit.key() for unit in e.affected_units()],
-            }
-            for e in combat.event_queue
-        ],
+        "events": [event_json(e) for e in combat.event_queue],
     }

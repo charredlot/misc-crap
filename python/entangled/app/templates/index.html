@@ -198,19 +198,22 @@ function initLayers(width, height) {
     }
 }
 
-function redrawEventQueue(events) {
-    domEventQueue.empty();
-    events.forEach(function(evt) {
-        let newElem = domEventTemplate.clone();
-        let eventText = "Countdown " + evt.countdown;
-        if (evt.unit_keys.length > 0) {
-            eventText += " " + evt.unit_keys.join(",");
-        }
+function appendEvent(evt) {
+    let newElem = domEventTemplate.clone();
+    let eventText = "Countdown " + evt.countdown;
+    if (evt.unit_keys.length > 0) {
+        eventText += " " + evt.unit_keys.join(",");
+    }
 
-        newElem.text(eventText);
-        domEventQueue.append(newElem);
-        newElem.show();
-    });
+    newElem.text(eventText);
+    domEventQueue.append(newElem);
+    newElem.show();
+}
+
+function redrawEventQueue(currEvent, events) {
+    domEventQueue.empty();
+    appendEvent(currEvent);
+    events.forEach(appendEvent);
 }
 
 function onLoad() {
@@ -310,7 +313,18 @@ function onLoad() {
             setKeys(viewport, viewportHexRadius);
             redraw();
 
-            redrawEventQueue(combat.events);
+            redrawEventQueue(combat.events[0], combat.events.slice(1));
+
+            // once it's setup, progress the game
+            $.ajax({
+                url: "/combat_step",
+                success: function(step_result) {
+                    let step = JSON.parse(step_result);
+
+                    console.log("step:", step);
+                    redrawEventQueue(step.curr_event, step.events);
+                },
+            });
         }
     });
 }

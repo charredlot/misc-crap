@@ -55,3 +55,6 @@ class UnitMoveCommand(Command):
 class UnitTurnBeganEffect(CombatEventEffect):
     def __init__(self, unit):
         self.unit = unit
+
+    def to_json(self):
+        return {"unit_key": self.unit.key(), "key": self.key()}

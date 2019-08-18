@@ -4,6 +4,7 @@ from typing import Iterable
 import heapq
 
 from engine.command import Command
+from util import to_json
 
 
 class CombatEventEffect(ABC):
@@ -11,7 +12,12 @@ class CombatEventEffect(ABC):
     For the UI to display what actually happened
     """
 
-    pass
+    def key(self):
+        return type(self).__name__
+
+    @abstractmethod
+    def to_json(self):
+        pass
 
 
 class CombatEvent(ABC):
@@ -107,3 +113,16 @@ class CombatEventQueue:
         while events:
             t = heapq.heappop(events)
             yield t[-1]
+
+
+@to_json.register(CombatEvent)
+def event_json(event):
+    return {
+        "countdown": event.countdown,
+        "unit_keys": [unit.key() for unit in event.affected_units()],
+    }
+
+
+@to_json.register(CombatEventEffect)
+def effect_json(effect):
+    return effect.to_json()
