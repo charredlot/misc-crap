@@ -41,6 +41,7 @@ class HexGrid:
 
 
 def coords_circle(center: AxialCoord, radius: int):
+    # https://www.redblobgames.com/grids/hexagons/
     # XXX: looping over cube coords, but there might be a better way
     for x in range(-radius, radius + 1):
         dq = x
