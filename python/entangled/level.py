@@ -36,6 +36,12 @@ class HexGrid:
     def get(self, q, r):
         return self.tiles.get(AxialCoord(q, r))
 
+    def __getitem__(self, coord: AxialCoord):
+        return self.tiles[coord]
+
+    def __contains__(self, coord: AxialCoord):
+        return coord in self.tiles
+
     def __repr__(self):
         return "\n".join(str(coord) for coord in self.tiles.keys())
 

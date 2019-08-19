@@ -29,9 +29,11 @@ var canvasLayers;
 var canvasPadding = 20;
 
 var LAYER_GRID = 0;
-var LAYER_GRID_SELECT = 1;
-var LAYER_GRID_DEBUG = 2;
-var LAYER_UNIT = 3;
+var LAYER_GRID_TARGET = 1;
+var LAYER_GRID_SELECT = 2;
+var LAYER_GRID_DEBUG = 3;
+var LAYER_UNIT = 4;
+var LAYER_COUNT = 5;
 
 var domActiveUnitName;
 var domActiveUnitAP;
@@ -197,7 +199,7 @@ function clearHex(ctx, vertices) {
     ctx.globalCompositeOperation = 'destination-out';
     drawHexPath(ctx, vertices);
     ctx.fillStyle = "black";
-    ctx.fill()
+    ctx.fill();
     ctx.globalCompositeOperation = op;
 }
 
@@ -216,7 +218,7 @@ function initLayers(width, height) {
     console.log("grid dimensions:", width, height);
 
     canvasLayers = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < LAYER_COUNT; i++) {
         let c = document.createElement("canvas");
         c.width = width;
         c.height = height;
@@ -246,35 +248,67 @@ function redrawEventQueue(currEvent, events) {
     events.forEach(appendEvent);
 }
 
-function handleEffect(effect, curr_event) {
+function drawTargetedHexes(newCoords, oldHexes) {
+    let ctx = canvasLayers[LAYER_GRID_TARGET].ctx;
+
+    if (oldHexes) {
+        oldHexes.forEach(function(hex) { clearHex(ctx, hex.vertices); });
+    }
+
+    let targeted = [];
+    newCoords.forEach(function(coord) {
+        let hex = hexFromAxial(coord.q, coord.r);
+        drawHex(ctx, hex.vertices, "rgba(36, 131, 255, 0.3)");
+        targeted.push(hex);
+    });
+
+    return targeted;
+}
+
+// a bit ugly because we're using the async call to find the moveable hexes
+function beginUnitTurn(effect, currEvent, moveCoords) {
+    let coord = combat.unit_key_to_coord[effect.unit_key];
+    let hex = combat.grid[coord.q][coord.r];
+    let unit = hex.unit;
+
+    selectHex(hex);
+
+    domActiveUnitName.text(unit.name);
+
+    // action points on this turn might be different from the unit's
+    // typical amount
+    let ap = "AP: ";
+    for (let i = 0; i < currEvent.action_points; i++) {
+        ap += "\u2022 ";
+    }
+    domActiveUnitAP.text(ap);
+
+    domActiveUnitActions.empty();
+    let newAction = domActionTemplate.clone();
+    newAction.text("Move");
+    newAction.click(function(evt) {
+        newAction.css("background", "#ea80ff");
+
+        ui.targetedHexes = drawTargetedHexes(moveCoords, ui.targetedHexes);
+        redraw();
+    });
+    domActiveUnitActions.append(newAction);
+    newAction.show();
+
+    ui.activeUnit = unit;
+}
+
+function handleEffect(effect, currEvent) {
     // this is probably going to be ugly
     switch (effect.key) {
         case "UnitTurnBeganEffect":
-            let coord = combat.unit_key_to_coord[effect.unit_key];
-            let hex = combat.grid[coord.q][coord.r];
-            let unit = hex.unit;
-
-            selectHex(hex);
-
-            domActiveUnitName.text(unit.name);
-
-            // action points on this turn might be different from the unit's
-            // typical amount
-            let ap = "AP: ";
-            for (let i = 0; i < curr_event.action_points; i++) {
-                ap += "\u2022 ";
-            }
-            domActiveUnitAP.text(ap);
-
-            domActiveUnitActions.empty();
-            let newAction = domActionTemplate.clone();
-            newAction.text("Move");
-            newAction.click(function(evt) {
-                newAction.css("background", "#ea80ff");
+            $.ajax({
+                url: "/move_radius/" + encodeURI(effect.unit_key),
+                success: function(result) {
+                    let moveCoords = JSON.parse(result);
+                    beginUnitTurn(effect, currEvent, moveCoords);
+                },
             });
-
-            domActiveUnitActions.append(newAction);
-            newAction.show();
             break;
     }
 }

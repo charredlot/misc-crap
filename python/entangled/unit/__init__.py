@@ -28,7 +28,7 @@ class Unit:
 
 @to_json.register(Unit)
 def unit_json(unit: Unit):
-    return {
+    obj = {
         key: getattr(unit, key)
         for key in (
             "name",
@@ -38,3 +38,5 @@ def unit_json(unit: Unit):
             "control",
         )
     }
+    obj["key"] = unit.key()
+    return obj

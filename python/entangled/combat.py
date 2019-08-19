@@ -32,6 +32,8 @@ class Combat:
         self.unit_key_to_coord: Dict[str, AxialCoord] = {}
         self.coord_to_unit_key: Dict[AxialCoord, str] = {}
 
+        self.unit_key_to_next_turn: Dict[str, UnitTurnCombatEvent] = {}
+
     def step(self) -> Tuple[CombatEvent, Iterable[CombatEventEffect]]:
         if self.curr_event and not self.curr_event.is_done():
             raise Exception("{} needs commands".format(self.curr_event))
@@ -80,7 +82,11 @@ class Combat:
         self.unit_key_to_coord[unit_key] = coord
         self.coord_to_unit_key[coord] = unit_key
 
-        self.push_event(UnitTurnCombatEvent(unit))
+        self.push_turn_event(unit, UnitTurnCombatEvent(unit))
+
+    def push_turn_event(self, unit: Unit, turn: UnitTurnCombatEvent):
+        self.unit_key_to_next_turn[unit.key()] = turn
+        self.push_event(turn)
 
     def push_event(self, event: CombatEvent):
         if self.debug.print_events:
