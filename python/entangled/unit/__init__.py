@@ -9,7 +9,7 @@ class Unit:
         self,
         name: str,
         turn_countdown: int = 100,
-        action_points: int = 8,
+        action_points: int = 6,
         control: int = CPU_CONTROL,
         friendly=False,
     ):
