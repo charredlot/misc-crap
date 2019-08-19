@@ -36,6 +36,11 @@ class UnitTurnCombatEvent(CommandableCombatEvent):
     def affected_units(self):
         return (self.unit,)
 
+    def to_json(self):
+        obj = super().to_json()
+        obj["action_points"] = self.action_points
+        return obj
+
     def is_done(self):
         return False
 

@@ -5,7 +5,7 @@ from flask import Blueprint, current_app, render_template
 
 from app.game import get_combat
 from combat import combat_json
-from engine.event import effect_json, event_json
+from engine.event import effect_json
 
 
 bp = Blueprint("argh", __name__, template_folder="templates")
@@ -27,6 +27,6 @@ def combat_step():
     curr_event, effects = current_app.combat.step()
 
     obj = combat_json(current_app.combat)
-    obj["curr_event"] = event_json(curr_event)
+    obj["curr_event"] = curr_event.to_json()
     obj["effects"] = [effect_json(e) for e in effects]
     return json.dumps(obj, indent=2)

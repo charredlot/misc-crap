@@ -8,7 +8,6 @@ from engine.event import (
     CombatEventEffect,
     CombatEventQueue,
     CommandableCombatEvent,
-    event_json,
 )
 from level import AxialCoord, HexGrid
 from unit import Unit, unit_json
@@ -108,5 +107,5 @@ def combat_json(combat):
             unit_key: {"q": coord.q, "r": coord.r}
             for unit_key, coord in combat.unit_key_to_coord.items()
         },
-        "events": [event_json(e) for e in combat.event_queue],
+        "events": [e.to_json() for e in combat.event_queue],
     }

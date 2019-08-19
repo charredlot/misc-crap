@@ -44,6 +44,12 @@ class CombatEvent(ABC):
         """
         return ()
 
+    def to_json(self):
+        return {
+            "countdown": self.countdown,
+            "unit_keys": [unit.key() for unit in self.affected_units()],
+        }
+
     def is_done(self) -> bool:
         return True
 
@@ -113,14 +119,6 @@ class CombatEventQueue:
         while events:
             t = heapq.heappop(events)
             yield t[-1]
-
-
-@to_json.register(CombatEvent)
-def event_json(event):
-    return {
-        "countdown": event.countdown,
-        "unit_keys": [unit.key() for unit in event.affected_units()],
-    }
 
 
 @to_json.register(CombatEventEffect)
