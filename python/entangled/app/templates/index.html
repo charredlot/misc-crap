@@ -26,7 +26,7 @@ var viewportDY;
 // this array of canvas elements hold the full grid which might be bigger
 // than the viewport. all the layers have the same dimensions
 var canvasLayers;
-var margin = 20;
+var canvasPadding = 20;
 
 var LAYER_GRID = 0;
 var LAYER_GRID_SELECT = 1;
@@ -270,6 +270,108 @@ function combatStep() {
     });
 }
 
+// @param tileToHexInfo: a function that gets any additional info from the tile
+//                       to put on the hex object
+function setupGridAndCanvasForTiles(tiles, tileToHexInfo) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let grid = {};
+
+    // find the max size of a theoretical canvas that could hold the
+    // entire grid. though the size of the grid is scaled to the
+    // viewport. the viewport will just use an offset to figure out
+    // which part of the grid is currently visible
+    // 1. calculate pixel coordinates as if q=0,r=0 corresponded to (0,0)
+    // 2. calculate min and max dimensions to figure out how big the canvas
+    //    needs to be
+    // 3. pad min and max so there's some space
+    // 4. set viewport offset to be min x and min y so top left of map shows
+    // 5. translate all coordinates by min x and min y to match 3.
+    tiles.forEach(function(tile) {
+        let hex = {};
+
+        if (grid[tile.q] === undefined) {
+            grid[tile.q] = {};
+        }
+        grid[tile.q][tile.r] = hex;
+
+        hex.q = tile.q;
+        hex.r = tile.r;
+        hex.center = axialToPoint(tile.q, tile.r, viewportHexRadius);
+        hex.vertices = hexVertices(hex.center.x, hex.center.y,
+                                   viewportHexRadius);
+
+        tileToHexInfo(tile, hex);
+
+        hex.vertices.forEach(function(vertex) {
+            minX = Math.min(minX, vertex.x);
+            maxX = Math.max(maxX, vertex.x);
+            minY = Math.min(minY, vertex.y);
+            maxY = Math.max(maxY, vertex.y);
+        });
+    });
+
+    minX -= canvasPadding;
+    maxX += canvasPadding;
+    minY -= canvasPadding;
+    maxY += canvasPadding;
+
+    console.log("grid x range:", minX, maxX, "y range:", minY, maxY);
+
+    Object.getOwnPropertyNames(grid).forEach(function(q) {
+        let rgrid = grid[q];
+        Object.getOwnPropertyNames(rgrid).forEach(function (r) {
+            let hex = grid[q][r];
+
+            hex.center.x -= minX;
+            hex.center.y -= minY;
+            hex.vertices.forEach(function(unused, i, vertices) {
+                vertices[i].x -= minX;
+                vertices[i].y -= minY;
+            });
+        });
+    });
+
+    viewportDX = minX;
+    viewportDY = minY;
+    initLayers(maxX - minX, maxY - minY);
+
+    return grid;
+}
+
+function drawGridOnLayers(grid) {
+    Object.getOwnPropertyNames(grid).forEach(function(q) {
+        let rgrid = grid[q];
+        Object.getOwnPropertyNames(rgrid).forEach(function (r) {
+            let hex = grid[q][r];
+
+            drawHex(canvasLayers[LAYER_GRID].ctx,
+                    hex.vertices,
+                    "#00bb22");
+
+            if (hex.unit) {
+                drawUnit(canvasLayers[LAYER_UNIT].ctx,
+                         hex.center.x,
+                         hex.center.y,
+                         (hex.unit.friendly ?
+                          "#2088ff" :
+                          "red"));
+            }
+
+            // XXX: this is debugging, remove later
+            let debugLayer = canvasLayers[LAYER_GRID_DEBUG];
+            debugLayer.ctx.font = "12px Courier New";
+            debugLayer.ctx.fillStyle = "black";
+            debugLayer.ctx.fillText(
+                q + ", " + r,
+                hex.center.x - (viewportHexRadius / 2),
+                hex.center.y);
+        });
+    });
+}
+
 function onLoad() {
     viewport = document.getElementById("theviewport");
     viewportCtx = viewport.getContext('2d');
@@ -283,93 +385,19 @@ function onLoad() {
     $.ajax({
         url: "/combat_state",
         success: function(result) {
-            let minX = Infinity;
-            let minY = Infinity;
-            let maxX = -Infinity;
-            let maxY = -Infinity;
-
-            // find the max size of a theoretical canvas that could hold the
-            // entire grid. though the size of the grid is scaled to the
-            // viewport. the viewport will just use an offset to figure out
-            // which part of the grid is currently visible
-            let grid = {};
             combat = JSON.parse(result);
-            combat.tiles.forEach(function(tile) {
-                let hex = {};
 
-                if (grid[tile.q] === undefined) {
-                    grid[tile.q] = {};
-                }
-                grid[tile.q][tile.r] = hex;
-
-                hex.q = tile.q;
-                hex.r = tile.r;
-                hex.center = axialToPoint(tile.q, tile.r, viewportHexRadius);
-                hex.vertices = hexVertices(hex.center.x, hex.center.y,
-                                           viewportHexRadius);
-
-                if (tile.unit_key) {
-                    hex.unit = combat.units[tile.unit_key];
+            let tileToHexInfo = function(tile, hex) {
+                if (!tile.unit_key) {
+                    return;
                 }
 
-                hex.vertices.forEach(function(vertex) {
-                    minX = Math.min(minX, vertex.x);
-                    maxX = Math.max(maxX, vertex.x);
-                    minY = Math.min(minY, vertex.y);
-                    maxY = Math.max(maxY, vertex.y);
-                });
-            });
+                hex.unit = combat.units[tile.unit_key];
+            };
+
+            let grid = setupGridAndCanvasForTiles(combat.tiles, tileToHexInfo);
+            drawGridOnLayers(grid);
             combat.grid = grid;
-
-            minX -= margin;
-            maxX += margin;
-            minY -= margin;
-            maxY += margin;
-
-            console.log("x range:", minX, maxX, "y range:", minY, maxY);
-
-            viewportDX = minX;
-            viewportDY = minY;
-            initLayers(maxX - minX, maxY - minY);
-
-            Object.getOwnPropertyNames(combat.grid).forEach(function(q) {
-                let rgrid = combat.grid[q];
-                Object.getOwnPropertyNames(rgrid).forEach(function (r) {
-                    let hex = combat.grid[q][r];
-
-                    // offset everything so the top left of the grid matches
-                    // the top left of grid's canvas. we want to actually
-                    // modify the vertices array in hex.
-                    hex.center.x -= minX;
-                    hex.center.y -= minY;
-                    hex.vertices.forEach(function(unused, i, vertices) {
-                        vertices[i].x -= minX;
-                        vertices[i].y -= minY;
-                    });
-
-                    drawHex(canvasLayers[LAYER_GRID].ctx,
-                            hex.vertices,
-                            "#00bb22");
-
-                    if (hex.unit) {
-                        drawUnit(canvasLayers[LAYER_UNIT].ctx,
-                                 hex.center.x,
-                                 hex.center.y,
-                                 (hex.unit.friendly ?
-                                  "#2088ff" :
-                                  "red"));
-                    }
-
-                    // XXX: this is debugging, remove later
-                    let debugLayer = canvasLayers[LAYER_GRID_DEBUG];
-                    debugLayer.ctx.font = "12px Courier New";
-                    debugLayer.ctx.fillStyle = "black";
-                    debugLayer.ctx.fillText(
-                        q + ", " + r,
-                        hex.center.x - (viewportHexRadius / 2),
-                        hex.center.y);
-                });
-            });
 
             setKeys(viewport, viewportHexRadius);
             redraw();
