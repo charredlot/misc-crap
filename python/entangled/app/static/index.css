@@ -1,3 +1,5 @@
+/* ----- generic top-level css ----- */
+
 body {
     background-color: #292929;
     color: white;
@@ -14,15 +16,18 @@ body {
     flex-direction: column;
 }
 
+#theviewport {
+    border: 1px solid;
+}
+
+/* ----- selected info css ----- */
+
 #selected-info {
     display: flex;
     flex-direction: column;
 }
 
 #selected-hex-info {
-    background: #2a51fa;
-    border: 1px solid;
-    border-radius: 5px;
     height: 2em;
     padding: 5px;
 
@@ -38,16 +43,7 @@ body {
     padding: 5px;
 }
 
-#unit-info {
-    border: 1px solid;
-    border-radius: 5px;
-    background: #2a51fa;
-    height: 5em;
-}
-
-#theviewport {
-    border: 1px solid;
-}
+/* ----- event-queue css ----- */
 
 #event-queue-column {
     background: #ea80ff;
@@ -85,4 +81,45 @@ body {
     margin: 1px;
     margin-left: 15px;
     padding: 5px;
+}
+
+/* ----- active-unit css ----- */
+
+#active-unit {
+    display: flex;
+    flex-direction: row;
+}
+
+#active-unit-stats {
+    border: 1px solid white;
+    border-radius: 5px;
+    background: #2a51fa;
+    height: 5em;
+    flex-grow: 1;
+    font-weight: bold;
+    margin: 5px;
+    padding: 5px;
+
+    display: flex;
+    flex-direction: column;
+}
+
+#active-unit-actions {
+    flex-grow: 4;
+
+    display: flex;
+    flex-direction: row;
+}
+
+#action-template {
+    background: #2a51fa;
+    border: 3px solid white;
+    border-radius: 10px;
+    color: white;
+    display: none;
+    font-size: large;
+    font-weight: bold;
+    margin: 5px;
+    padding: 20px;
+    width: 25%;
 }

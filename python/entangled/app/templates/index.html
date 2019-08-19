@@ -33,10 +33,16 @@ var LAYER_GRID_SELECT = 1;
 var LAYER_GRID_DEBUG = 2;
 var LAYER_UNIT = 3;
 
+var domActiveUnitName;
+var domActiveUnitAP;
+var domActiveUnitActions;
+var domActionTemplate;
 var domEventQueue;
 var domEventTemplate;
 var domSelectedHexInfoText;
 var domSelectedUnitName;
+
+var colorActionSelected;
 
 function redraw() {
     viewportCtx.clearRect(0, 0, viewport.width, viewport.height);
@@ -240,12 +246,35 @@ function redrawEventQueue(currEvent, events) {
     events.forEach(appendEvent);
 }
 
-function handleEffect(effect) {
+function handleEffect(effect, curr_event) {
     // this is probably going to be ugly
     switch (effect.key) {
         case "UnitTurnBeganEffect":
             let coord = combat.unit_key_to_coord[effect.unit_key];
-            selectHex(combat.grid[coord.q][coord.r]);
+            let hex = combat.grid[coord.q][coord.r];
+            let unit = hex.unit;
+
+            selectHex(hex);
+
+            domActiveUnitName.text(unit.name);
+
+            // action points on this turn might be different from the unit's
+            // typical amount
+            let ap = "AP: ";
+            for (let i = 0; i < curr_event.action_points; i++) {
+                ap += "\u2022 ";
+            }
+            domActiveUnitAP.text(ap);
+
+            domActiveUnitActions.empty();
+            let newAction = domActionTemplate.clone();
+            newAction.text("Move");
+            newAction.click(function(evt) {
+                newAction.css("background", "#ea80ff");
+            });
+
+            domActiveUnitActions.append(newAction);
+            newAction.show();
             break;
     }
 }
@@ -256,7 +285,7 @@ function handleCombatStep(step_result) {
     console.log("step:", step);
 
     step.effects.forEach(function(effect) {
-        handleEffect(effect);
+        handleEffect(effect, step.curr_event);
     });
 
     // TODO: handle redrawing grid and unit changes
@@ -382,6 +411,11 @@ function onLoad() {
     domSelectedHexInfoText = $("#selected-hex-info-text");
     domSelectedUnitName = $("#selected-unit-name");
 
+    domActiveUnitName = $("#active-unit-name");
+    domActiveUnitAP = $("#active-unit-ap");
+    domActiveUnitActions = $("#active-unit-actions");
+    domActionTemplate = $("#action-template");
+
     $.ajax({
         url: "/combat_state",
         success: function(result) {
@@ -419,9 +453,6 @@ $( window ).on("load", onLoad);
         <div id="all">
             <div id="canvas-column">
                 <div id="selected-info">
-                    <div id="selected-hex-info">
-                        <span id="selected-hex-info-text">&nbsp;</span>
-                    </div>
                     <div id="selected-unit-info">
                         <span id="selected-unit-name">&nbsp;</span>
                     </div>
@@ -429,12 +460,16 @@ $( window ).on("load", onLoad);
 
                 <canvas id="theviewport" width=800 height=600></canvas>
 
-                <div id="unit-info">
-                    <div id="unit-info-name">
-                        &nbsp;
+                <div id="selected-hex-info">
+                    <span id="selected-hex-info-text">&nbsp;</span>
+                </div>
+                <div id="active-unit">
+                    <div id="active-unit-stats">
+                        <div id="active-unit-name">&nbsp;</div>
+                        <div id="active-unit-ap">&nbsp;</div>
                     </div>
-                    <div id="unit-info-action-points">
-                        &nbsp;
+                    <div id="active-unit-actions">
+                        <button type="button" id="action-template"></button>
                     </div>
                 </div>
             </div>
