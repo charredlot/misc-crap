@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import Dict, Iterable, Optional, Tuple
 
 import logging
@@ -47,7 +48,9 @@ class Combat:
         self.curr_event = event
         return event, effects
 
-    def process_command(self, command: Command) -> Iterable[CombatEventEffect]:
+    def process_command(
+        self, command: "CombatCommand"
+    ) -> Iterable[CombatEventEffect]:
         # XXX: this needs to be single-threaded with step, add lock later
         if not self.curr_event:
             logging.error("No event expecting commands: {}", command)
@@ -59,7 +62,7 @@ class Combat:
             )
             return ()
 
-        return self.curr_event.execute_command(self, command)
+        return command.apply(self)
 
     def place_unit(self, unit: Unit, coord: AxialCoord):
         unit_key = unit.key()

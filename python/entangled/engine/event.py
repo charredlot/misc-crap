@@ -3,7 +3,6 @@ from typing import Iterable
 
 import heapq
 
-from engine.command import Command
 from util import to_json
 
 
@@ -69,15 +68,6 @@ class CommandableCombatEvent(CombatEvent):
     ):
         super(CommandableCombatEvent, self).__init__(countdown, priority)
         self.unit = unit
-
-    @abstractmethod
-    def execute_command(
-        self, combat, command: Command
-    ) -> Iterable[CombatEventEffect]:
-        """
-        @param combat: type Combat, but avoid circular import for now
-        """
-        pass
 
     def is_done(self) -> bool:
         # execute_command should make this eventually return True

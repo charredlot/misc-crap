@@ -1,7 +1,5 @@
 from typing import Iterable
 
-from level import AxialCoord
-from engine.command import Command
 from engine.event import CombatEvent, CombatEventEffect, CommandableCombatEvent
 
 
@@ -28,11 +26,6 @@ class UnitTurnCombatEvent(CommandableCombatEvent):
         # UI needs to know that turn started
         return (UnitTurnBeganEffect(self.unit),)
 
-    def execute_command(
-        self, combat, command: Command
-    ) -> Iterable[CombatEventEffect]:
-        return ()
-
     def affected_units(self):
         return (self.unit,)
 
@@ -46,15 +39,6 @@ class UnitTurnCombatEvent(CommandableCombatEvent):
 
     def __repr__(self):
         return "{} for {}".format(super().__repr__(), self.unit)
-
-
-class UnitMoveCommand(Command):
-    """
-    This is a normal move which is only to an adjacent tile
-    """
-
-    def __init__(self, dest: AxialCoord):
-        self.dest = dest
 
 
 class UnitTurnBeganEffect(CombatEventEffect):
