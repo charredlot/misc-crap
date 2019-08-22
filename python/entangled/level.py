@@ -33,8 +33,8 @@ class HexGrid:
     def add(self, tile: HexTile):
         self.tiles[tile.coord] = tile
 
-    def get(self, q, r):
-        return self.tiles.get(AxialCoord(q, r))
+    def get(self, coord: AxialCoord) -> HexTile:
+        return self.tiles.get(coord)
 
     def __getitem__(self, coord: AxialCoord):
         return self.tiles[coord]
