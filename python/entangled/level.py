@@ -59,6 +59,6 @@ def coords_circle(center: AxialCoord, radius: int):
 
 
 def are_coords_adjacent(a: AxialCoord, b: AxialCoord):
-    dx = b.q - a.q
-    dy = b.r - a.r
-    return (dx, dy) in AXIAL_NEIGHBORS
+    dq = b.q - a.q
+    dr = b.r - a.r
+    return (dq, dr) in AXIAL_NEIGHBORS
