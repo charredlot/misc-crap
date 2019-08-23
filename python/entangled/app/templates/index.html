@@ -7,8 +7,13 @@
 
         <script>
 "use strict";
+var UI_STATE_NONE = 1;
+var UI_STATE_AJAX = 2;
+var UI_STATE_MOVING = 3;
+var UI_STATE_MOVE_SELECTED = 4;
+
 var combat;
-var ui = {};
+var ui = {state: UI_STATE_NONE};
 
 var center = {x: 0, y: 0};
 var cameraOffset = {dx: 0, dy: 0};
@@ -63,11 +68,7 @@ function hexFromAxial(q, r) {
 }
 
 function selectHex(hex) {
-    if (!hex) {
-        return;
-    }
-
-    let oldHex = ui.hex;
+    let oldHex = ui.selectedHex;
     let ctx = canvasLayers[LAYER_GRID_SELECT].ctx;
 
     if (oldHex) {
@@ -88,7 +89,7 @@ function selectHex(hex) {
     }
 
     redraw();
-    ui.hex = hex;
+    ui.selectedHex = hex;
 }
 
 function clickToHex(evt) {
@@ -145,8 +146,38 @@ function setKeys(clickCanvas, hexRadius) {
     });
 
 
-    clickCanvas.addEventListener('click', function(event) {
-        selectHex(clickToHex(event));
+    clickCanvas.addEventListener('click', function(evt) {
+        let hex = clickToHex(evt);
+        if (!hex) {
+            return;
+        }
+
+        switch (ui.state) {
+            case UI_STATE_MOVING:
+                if (ui.selectedHex &&
+                    (ui.selectedHex === hex) &&
+                    ui.targetedHexes.includes(ui.selectedHex)) {
+                    $.ajax({
+                        url: ("/move_active_unit/" +
+                              encodeURI(hex.q) +
+                              "/" +
+                              encodeURI(hex.r)),
+                        success: function(result) {
+                            // XXX: update the display and handle effects
+                            console.log("move to", hex)
+                        },
+                    });
+                } else {
+                    selectHex(hex);
+                }
+                break;
+            case UI_STATE_AJAX:
+                // no clicks while waiting for an ajax request to finish
+                break;
+            default:
+                selectHex(hex);
+                break;
+        }
     });
 }
 
@@ -290,6 +321,7 @@ function beginUnitTurn(effect, currEvent, moveCoords) {
         newAction.css("background", "#ea80ff");
 
         ui.targetedHexes = drawTargetedHexes(moveCoords, ui.targetedHexes);
+        ui.state = UI_STATE_MOVING;
         redraw();
     });
     domActiveUnitActions.append(newAction);

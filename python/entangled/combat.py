@@ -9,8 +9,9 @@ from engine.event import (
     CombatEventEffect,
     CombatEventQueue,
     CommandableCombatEvent,
+    ErrorEffect,
 )
-from level import AxialCoord, HexGrid
+from level import AxialCoord, coords_circle, HexGrid
 from unit import Unit, unit_json
 from unit.event import UnitTurnCombatEvent
 from util import to_json
@@ -97,6 +98,15 @@ class Combat:
 
         self.event_queue.push(event)
 
+    def unit_move_coords(self, unit_key: str) -> Iterable[AxialCoord]:
+        center = self.unit_key_to_coord[unit_key]
+        next_turn = self.unit_key_to_next_turn[unit_key]
+        return [
+            coord
+            for coord in coords_circle(center, next_turn.action_points)
+            if (coord in self.grid) and (coord not in self.coord_to_unit_key)
+        ]
+
 
 @to_json.register(Combat)
 def combat_json(combat):
@@ -118,3 +128,35 @@ def combat_json(combat):
         },
         "events": [e.to_json() for e in combat.event_queue],
     }
+
+
+class CombatCommand(Command):
+    @abstractmethod
+    def apply(self, combat: Combat) -> Iterable[CombatEventEffect]:
+        return ()
+
+
+class MoveActiveUnitCommand(CombatCommand):
+    """
+    This is a normal move
+    """
+
+    def __init__(self, dest: AxialCoord):
+        self.dest = dest
+
+    def apply(self, combat: Combat) -> Iterable[CombatEventEffect]:
+        if not isinstance(combat.curr_event, UnitTurnCombatEvent):
+            return (
+                ErrorEffect(
+                    "{} is not a UnitTurnCombatEvent".format(combat.curr_event)
+                ),
+            )
+
+        dest_tile = combat.grid.get(self.dest)
+        if not dest_tile:
+            return (ErrorEffect("{} not in grid".format(self.dest)),)
+
+        # unit = self.curr_event.unit
+        # src_tile = combat.unit_key_to_coord.get[unit.key()]
+        # XXX: do path stuff here
+        return ()

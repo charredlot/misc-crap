@@ -114,3 +114,11 @@ class CombatEventQueue:
 @to_json.register(CombatEventEffect)
 def effect_json(effect):
     return effect.to_json()
+
+
+class ErrorEffect(CombatEventEffect):
+    def __init__(self, error):
+        self.error = error
+
+    def to_json(self):
+        return {"error": self.error}

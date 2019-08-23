@@ -5,9 +5,9 @@ import time
 from flask import Blueprint, current_app, render_template
 
 from app.game import get_combat
-from combat import combat_json
+from combat import combat_json, MoveActiveUnitCommand
 from engine.event import effect_json
-from level import coords_circle
+from level import AxialCoord
 
 
 bp = Blueprint("argh", __name__, template_folder="templates")
@@ -37,16 +37,25 @@ def combat_step():
 @bp.route("/move_radius/<unit_key>")
 def move_radius(unit_key):
     unit_key = unquote(unit_key)
-    center = current_app.combat.unit_key_to_coord[unit_key]
-    next_turn = current_app.combat.unit_key_to_next_turn[unit_key]
     combat = current_app.combat
 
     return json.dumps(
         [
             {"q": coord.q, "r": coord.r}
-            for coord in coords_circle(center, next_turn.action_points)
-            if (coord in combat.grid)
-            and (coord not in combat.coord_to_unit_key)
+            for coord in combat.unit_move_coords(unit_key)
         ],
         indent=2,
     )
+
+
+@bp.route("/move_active_unit/<q>/<r>")
+def move_active_unit(q, r):
+    q = int(q)
+    r = int(r)
+    combat = current_app.combat
+    effects = combat.process_command(MoveActiveUnitCommand(AxialCoord(q, r)))
+
+    obj = combat_json(combat)
+    obj["curr_event"] = combat.curr_event.to_json()
+    obj["effects"] = [effect_json(e) for e in effects]
+    return json.dumps(obj, indent=2)
