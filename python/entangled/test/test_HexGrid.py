@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from level import AxialCoord, AxialEdge, HexGrid
+from level import AxialCoord, AxialEdge, coords_circle, HexGrid
 
 
 class TestHexGrid(TestCase):
@@ -34,3 +34,34 @@ class TestHexGrid(TestCase):
             grid = HexGrid(test["vertices"])
             edges = grid.default_edge_weights()
             self.assertEqual(set(edges.keys()), set(test["edges"]))
+
+    def test_shortest_path(self):
+        tests = (
+            {
+                "vertices": (AxialCoord(0, 0), AxialCoord(1, 0)),
+                "source": AxialCoord(0, 0),
+                "destination": AxialCoord(1, 0),
+                "path": [AxialCoord(0, 0), AxialCoord(1, 0)],
+            },
+            {
+                "vertices": (AxialCoord(0, 0), AxialCoord(2, 3)),
+                "source": AxialCoord(0, 0),
+                "destination": AxialCoord(2, 3),
+                "path": [],
+            },
+            {
+                "vertices": list(coords_circle(AxialCoord(0, 0), 1)),
+                "source": AxialCoord(0, -1),
+                "destination": AxialCoord(0, 1),
+                "path": [
+                    AxialCoord(0, -1),
+                    AxialCoord(0, 0),
+                    AxialCoord(0, 1),
+                ],
+            },
+        )
+
+        for test in tests:
+            grid = HexGrid(test["vertices"])
+            path = grid.shortest_path(test["source"], test["destination"])
+            self.assertEqual(path, test["path"])

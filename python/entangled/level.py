@@ -1,5 +1,5 @@
-from collections import namedtuple
-from typing import Dict, Iterable
+from collections import defaultdict, deque, namedtuple
+from typing import Deque, Dict, Iterable, List, Set
 
 
 AxialCoord = namedtuple("AxialCoord", ["q", "r"])
@@ -40,6 +40,69 @@ class HexGrid:
                 if coord in self.tiles:
                     edge_weights[AxialEdge(tile.coord, coord)] = 1
         return edge_weights
+
+    def shortest_path(
+        self, src: AxialCoord, dst: AxialCoord
+    ) -> List[AxialCoord]:
+        # from A* search wiki
+        best_prev: Dict[AxialCoord, AxialCoord] = {}
+
+        # this is the g(x), cheapest cost to get to node x
+        g_score: Dict[AxialCoord, float] = defaultdict(lambda: float("inf"))
+
+        # f(x) = g(x) + h(x) where h is the heuristic
+        f_score: Dict[AxialCoord, float] = defaultdict(lambda: float("inf"))
+
+        # with min costs of 1, this should be an admissible heuristic
+        def _heuristic(coord: AxialCoord):
+            dq = coord.q - src.q
+            dr = coord.r - src.r
+            return (dq * dq) + (dr * dr)
+
+        g_score[src] = 0
+        f_score[src] = _heuristic(src)
+
+        visited = set()
+
+        # heap value is the fscore
+        open_set: Set[AxialCoord] = set()
+        open_set.add(src)
+        while open_set:
+            # XXX: not ideal, need a heap that supports removal
+            curr = next(iter(sorted(open_set, key=lambda n: f_score[n])))
+            open_set.remove(curr)
+            if curr == dst:
+                # work backwards to get the best path
+                q: Deque[AxialCoord] = deque()
+                q.append(curr)
+                while curr in best_prev:
+                    curr = best_prev[curr]
+                    q.appendleft(curr)
+                return list(q)
+
+            visited.add(curr)
+            for neighbor in adjacent_coords(curr):
+                if neighbor not in self.tiles:
+                    continue
+
+                if neighbor in visited:
+                    continue
+
+                tentative_g_score = (
+                    g_score[curr]
+                    + self.edge_weights[AxialEdge(curr, neighbor)]
+                )
+                if tentative_g_score < g_score[neighbor]:
+                    best_prev[neighbor] = curr
+                    g_score[neighbor] = tentative_g_score
+                    f_score[neighbor] = tentative_g_score + _heuristic(
+                        neighbor
+                    )
+
+                open_set.add(neighbor)
+
+        # no path
+        return []
 
     def add(self, tile: HexTile):
         for neighbor in adjacent_coords(tile.coord):
