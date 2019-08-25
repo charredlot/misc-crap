@@ -105,6 +105,8 @@ class Combat:
         # the coord
         center = self.unit_key_to_coord[unit_key]
         next_turn = self.unit_key_to_next_turn[unit_key]
+        # FIXME: this is actually broken because we need to know the action
+        # point cost to make sure some of these paths make sense.
         return [
             (coord, path)
             for coord, path in (

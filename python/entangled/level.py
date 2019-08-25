@@ -27,24 +27,40 @@ class HexTile:
 
 
 class HexGrid:
-    def __init__(self, coords=None):
+    def __init__(self, coords=None, default_edge_weight=1):
+        self._default_edge_weight = 1
         if not coords:
             self.tiles = dict()
         else:
             self.tiles = {coord: HexTile(coord) for coord in coords}
-            self.edge_weights = self.default_edge_weights()
+            # neighbors are adjacent, by default
+            self.adjacencies = {
+                coord: {
+                    neighbor: self._default_edge_weight
+                    for neighbor in neighbors_coords(coord)
+                    if neighbor in self.tiles
+                }
+                for coord in self.tiles
+            }
         self._min_q = None
         self._max_r = None
         self._min_r = None
         self._max_r = None
 
-    def default_edge_weights(self) -> Dict[AxialEdge, int]:
-        edge_weights = {}
-        for tile in self.tiles.values():
-            for coord in adjacent_coords(tile.coord):
-                if coord in self.tiles:
-                    edge_weights[AxialEdge(tile.coord, coord)] = 1
-        return edge_weights
+    def adjacent_coords(self, center: AxialCoord) -> Iterable[AxialCoord]:
+        adjacent = self.adjacencies.get(center)
+        if not adjacent:
+            return []
+
+        return list(adjacent)
+
+    def edges(self):
+        # dunno if this will be useful
+        return (
+            AxialEdge(coord, neighbor)
+            for coord, adjacent_coords in self.adjacencies.items()
+            for neighbor in adjacent_coords
+        )
 
     def shortest_path(
         self, src: AxialCoord, dst: AxialCoord
@@ -99,17 +115,14 @@ class HexGrid:
                 best_dir = direction_to(curr_predecessor, curr)
 
             visited.add(curr)
-            for neighbor in adjacent_coords(curr):
+            for neighbor, weight in self.adjacencies.get(curr, {}).items():
                 if neighbor not in self.tiles:
                     continue
 
                 if neighbor in visited:
                     continue
 
-                tentative_g_score = (
-                    g_score[curr]
-                    + self.edge_weights[AxialEdge(curr, neighbor)]
-                )
+                tentative_g_score = g_score[curr] + weight
                 if tentative_g_score < g_score[neighbor]:
                     best_prev[neighbor] = curr
                     g_score[neighbor] = tentative_g_score
@@ -130,10 +143,18 @@ class HexGrid:
         return []
 
     def add(self, tile: HexTile):
-        for neighbor in adjacent_coords(tile.coord):
-            if neighbor in self.tiles:
-                self.edge_weights[AxialEdge(tile.coord, neighbor)] = 1
-                self.edge_weights[AxialEdge(neighbor, tile.coord)] = 1
+        self.adjacencies[tile.coord] = {
+            neighbor: self._default_edge_weight
+            for neighbor in neighbors_coords(tile.coord)
+            if neighbor in self.tiles
+        }
+        for neighbor in neighbors_coords(tile.coord):
+            if neighbor not in self.tiles:
+                continue
+
+            adjacent = self.adjacencies.setdefault(neighbor, {})
+            adjacent[tile.coord] = self._default_edge_weight
+
         self.tiles[tile.coord] = tile
 
     def get(self, coord: AxialCoord) -> HexTile:
@@ -161,13 +182,13 @@ def coords_circle(center: AxialCoord, radius: int):
             yield AxialCoord(center.q + dq, center.r + dr)
 
 
-def are_coords_adjacent(a: AxialCoord, b: AxialCoord) -> bool:
+def are_coords_neighbors(a: AxialCoord, b: AxialCoord) -> bool:
     dq = b.q - a.q
     dr = b.r - a.r
     return (dq, dr) in AXIAL_NEIGHBORS
 
 
-def adjacent_coords(center: AxialCoord) -> Iterable[AxialCoord]:
+def neighbors_coords(center: AxialCoord) -> Iterable[AxialCoord]:
     for dq, dr in AXIAL_NEIGHBORS:
         yield AxialCoord(center.q + dq, center.r + dr)
 

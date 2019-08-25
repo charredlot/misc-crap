@@ -32,8 +32,7 @@ class TestHexGrid(TestCase):
 
         for test in tests:
             grid = HexGrid(test["vertices"])
-            edges = grid.default_edge_weights()
-            self.assertEqual(set(edges.keys()), set(test["edges"]))
+            self.assertEqual(set(grid.edges()), set(test["edges"]))
 
     def test_shortest_path(self):
         tests = (
