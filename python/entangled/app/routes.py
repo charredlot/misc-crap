@@ -34,15 +34,22 @@ def combat_step():
     return json.dumps(obj, indent=2)
 
 
-@bp.route("/move_radius/<unit_key>")
-def move_radius(unit_key):
+@bp.route("/move_coords/<unit_key>")
+def move_coords(unit_key):
     unit_key = unquote(unit_key)
     combat = current_app.combat
 
     return json.dumps(
         [
-            {"q": coord.q, "r": coord.r}
-            for coord in combat.unit_move_coords(unit_key)
+            {
+                "q": coord.q,
+                "r": coord.r,
+                "path": [
+                    {"q": path_coord.q, "r": path_coord.r}
+                    for path_coord in path
+                ],
+            }
+            for coord, path in combat.unit_move_coords(unit_key)
         ],
         indent=2,
     )

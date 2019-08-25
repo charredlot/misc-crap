@@ -35,10 +35,11 @@ var canvasPadding = 20;
 
 var LAYER_GRID = 0;
 var LAYER_GRID_TARGET = 1;
-var LAYER_GRID_SELECT = 2;
-var LAYER_GRID_DEBUG = 3;
-var LAYER_UNIT = 4;
-var LAYER_COUNT = 5;
+var LAYER_GRID_TARGET_PATH = 2;
+var LAYER_GRID_SELECT = 3;
+var LAYER_GRID_DEBUG = 4;
+var LAYER_UNIT = 5;
+var LAYER_COUNT = 6;
 
 var domActiveUnitName;
 var domActiveUnitAP;
@@ -67,7 +68,7 @@ function hexFromAxial(q, r) {
     return rgrid[r];
 }
 
-function selectHex(hex) {
+function selectHex(hex, skipRedraw) {
     let oldHex = ui.selectedHex;
     let ctx = canvasLayers[LAYER_GRID_SELECT].ctx;
 
@@ -88,8 +89,11 @@ function selectHex(hex) {
         domSelectedUnitName.text("")
     }
 
-    redraw();
     ui.selectedHex = hex;
+
+    if (!skipRedraw) {
+        redraw();
+    }
 }
 
 function clickToHex(evt) {
@@ -116,6 +120,31 @@ function clickToHex(evt) {
     }
 
     return hexFromAxial(q, r);
+}
+
+function drawHexPath(path) {
+    // draws a line connecting the centers of each hex in path
+    let layer = canvasLayers[LAYER_GRID_TARGET_PATH];
+    let ctx = layer.ctx;
+
+    ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
+    ctx.setLineDash([15, 5]);
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = "#2a51fa";
+
+    // this is probably an abuse of reduce
+    ctx.beginPath();
+    path.forEach(function (curr, index) {
+        let hex = hexFromAxial(curr.q, curr.r);
+        if (index === 0) {
+            ctx.moveTo(hex.center.x, hex.center.y);
+        }
+        else {
+            ctx.lineTo(hex.center.x, hex.center.y);
+        }
+    });
+    ctx.stroke();
 }
 
 function setKeys(clickCanvas, hexRadius) {
@@ -168,7 +197,20 @@ function setKeys(clickCanvas, hexRadius) {
                         },
                     });
                 } else {
-                    selectHex(hex);
+                    if (ui.targetedCoords) {
+                        // a map would be better but it's annoying to do the
+                        // two-part lookup since javascript doesn't have
+                        // tuple keys. could convert to a string but that's
+                        // gross too.
+                        let coord = ui.targetedCoords.find(function (coord) {
+                            return (coord.q === hex.q) && (coord.r === hex.r);
+                        });
+                        if (coord && coord.path) {
+                            drawHexPath(coord.path);
+                        }
+                    }
+                    selectHex(hex, true);
+                    redraw();
                 }
                 break;
             case UI_STATE_AJAX:
@@ -201,7 +243,7 @@ function hexVertices(centerX, centerY, radius) {
     ];
 }
 
-function drawHexPath(ctx, vertices) {
+function drawHexPerimeter(ctx, vertices) {
     ctx.beginPath();
     let vertex = vertices[0];
     ctx.moveTo(vertex.x, vertex.y);
@@ -216,11 +258,12 @@ function drawHexPath(ctx, vertices) {
 // verticess is a list like [{x: x, y: y}, ...]
 // it should have 6 vertices
 function drawHex(ctx, vertices, fillStyle) {
-    drawHexPath(ctx, vertices);
+    drawHexPerimeter(ctx, vertices);
 
     ctx.fillStyle = fillStyle;
     ctx.fill();
 
+    ctx.lineWidth = 1;
     ctx.strokeStyle = "black";
     ctx.stroke();
 }
@@ -228,7 +271,7 @@ function drawHex(ctx, vertices, fillStyle) {
 function clearHex(ctx, vertices) {
     let op = ctx.globalCompositeOperation;
     ctx.globalCompositeOperation = 'destination-out';
-    drawHexPath(ctx, vertices);
+    drawHexPerimeter(ctx, vertices);
     ctx.fillStyle = "black";
     ctx.fill();
     ctx.globalCompositeOperation = op;
@@ -327,6 +370,7 @@ function beginUnitTurn(effect, currEvent, moveCoords) {
     domActiveUnitActions.append(newAction);
     newAction.show();
 
+    ui.targetedCoords = moveCoords;
     ui.activeUnit = unit;
 }
 
@@ -335,7 +379,7 @@ function handleEffect(effect, currEvent) {
     switch (effect.key) {
         case "UnitTurnBeganEffect":
             $.ajax({
-                url: "/move_radius/" + encodeURI(effect.unit_key),
+                url: "/move_coords/" + encodeURI(effect.unit_key),
                 success: function(result) {
                     let moveCoords = JSON.parse(result);
                     beginUnitTurn(effect, currEvent, moveCoords);

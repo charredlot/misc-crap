@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import logging
 
@@ -98,13 +98,21 @@ class Combat:
 
         self.event_queue.push(event)
 
-    def unit_move_coords(self, unit_key: str) -> Iterable[AxialCoord]:
+    def unit_move_coords(
+        self, unit_key: str
+    ) -> Iterable[Tuple[AxialCoord, List[AxialCoord]]]:
+        # tuple is coord and the shortest path from the unit to
+        # the coord
         center = self.unit_key_to_coord[unit_key]
         next_turn = self.unit_key_to_next_turn[unit_key]
         return [
-            coord
-            for coord in coords_circle(center, next_turn.action_points)
-            if (coord in self.grid) and (coord not in self.coord_to_unit_key)
+            (coord, path)
+            for coord, path in (
+                (coord, self.grid.shortest_path(center, coord))
+                for coord in coords_circle(center, next_turn.action_points)
+                if coord != center
+            )
+            if path
         ]
 
 
