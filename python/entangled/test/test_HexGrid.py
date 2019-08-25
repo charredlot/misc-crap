@@ -59,6 +59,18 @@ class TestHexGrid(TestCase):
                     AxialCoord(0, 1),
                 ],
             },
+            {
+                "vertices": list(coords_circle(AxialCoord(0, 0), 4)),
+                "source": AxialCoord(0, 2),
+                "destination": AxialCoord(-1, -1),
+                "path": [
+                    AxialCoord(0, 2),
+                    AxialCoord(0, 1),
+                    AxialCoord(0, 0),
+                    AxialCoord(0, -1),
+                    AxialCoord(-1, -1),
+                ],
+            },
         )
 
         for test in tests:

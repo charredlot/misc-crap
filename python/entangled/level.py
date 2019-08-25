@@ -1,13 +1,18 @@
 from collections import defaultdict, deque, namedtuple
-from typing import Deque, Dict, Iterable, List, Set
+from math import gcd, sqrt
+from typing import Deque, Dict, Iterable, List, Set, Tuple
 
 
 AxialCoord = namedtuple("AxialCoord", ["q", "r"])
+AxialDir = namedtuple("AxialDir", ["dq", "dr"])
 AxialEdge = namedtuple("AxialEdge", ["src", "dst"])
 
 AXIAL_NEIGHBORS = frozenset(
     ((0, -1), (1, -1), (1, 0), (0, 1), (-1, 1), (-1, 0))
 )
+
+_SQRT3 = sqrt(3)
+_HALF_SQRT3 = _SQRT3 / 2.0
 
 
 class HexTile:
@@ -53,14 +58,22 @@ class HexGrid:
         # f(x) = g(x) + h(x) where h is the heuristic
         f_score: Dict[AxialCoord, float] = defaultdict(lambda: float("inf"))
 
-        # with min costs of 1, this should be an admissible heuristic
+        # with min costs of 1, this should be an admissible heuristic. need to
+        # calculate the distance if we drew it, not using the coords because
+        # they don't correspond to distance exactly
+        # we'll add an extra 0.1 if it's not in a straight line on the current
+        # best path.
+        dst_x, dst_y = axial_to_cartesian(dst)
+
         def _heuristic(coord: AxialCoord):
-            dq = coord.q - src.q
-            dr = coord.r - src.r
-            return (dq * dq) + (dr * dr)
+            x, y = axial_to_cartesian(coord)
+            dx = x - dst_x
+            dy = y - dst_y
+            # use straight line distance / 2 to give us some headroom
+            return sqrt((dx * dx) + (dy * dy)) / 2.0
 
         g_score[src] = 0
-        f_score[src] = _heuristic(src)
+        f_score[src] = 0
 
         visited = set()
 
@@ -80,6 +93,11 @@ class HexGrid:
                     q.appendleft(curr)
                 return list(q)
 
+            best_dir = None
+            curr_predecessor = best_prev.get(curr)
+            if curr_predecessor:
+                best_dir = direction_to(curr_predecessor, curr)
+
             visited.add(curr)
             for neighbor in adjacent_coords(curr):
                 if neighbor not in self.tiles:
@@ -95,9 +113,16 @@ class HexGrid:
                 if tentative_g_score < g_score[neighbor]:
                     best_prev[neighbor] = curr
                     g_score[neighbor] = tentative_g_score
-                    f_score[neighbor] = tentative_g_score + _heuristic(
-                        neighbor
-                    )
+
+                    h_score = _heuristic(neighbor)
+                    if best_dir:
+                        curr_dir = direction_to(curr, neighbor)
+                        if curr_dir != best_dir:
+                            # this is a bit hacky, but we're just trying to
+                            # prefer keeping in the same direction without
+                            # biasing towards unoptimal paths
+                            h_score += 0.1
+                    f_score[neighbor] = tentative_g_score + h_score
 
                 open_set.add(neighbor)
 
@@ -136,7 +161,7 @@ def coords_circle(center: AxialCoord, radius: int):
             yield AxialCoord(center.q + dq, center.r + dr)
 
 
-def are_coords_adjacent(a: AxialCoord, b: AxialCoord):
+def are_coords_adjacent(a: AxialCoord, b: AxialCoord) -> bool:
     dq = b.q - a.q
     dr = b.r - a.r
     return (dq, dr) in AXIAL_NEIGHBORS
@@ -145,3 +170,26 @@ def are_coords_adjacent(a: AxialCoord, b: AxialCoord):
 def adjacent_coords(center: AxialCoord) -> Iterable[AxialCoord]:
     for dq, dr in AXIAL_NEIGHBORS:
         yield AxialCoord(center.q + dq, center.r + dr)
+
+
+def direction_to(src: AxialCoord, dst: AxialCoord) -> AxialDir:
+    """
+    Returns the direction in units of integral hexes.
+    i.e. this doesn't normalize, so it's not a unit vector
+    """
+    dq = dst.q - src.q
+    dr = dst.r - src.r
+    divisor = gcd(dq, dr)
+    return AxialDir(dq // divisor, dr // divisor)
+
+
+def axial_to_cartesian(coord: AxialCoord) -> Tuple[float, float]:
+    # radius for a hex is center to vertex distance. the distance between two
+    # adjancent hexes is 2h, where h is the height of the equilateral triangle
+    # h = radius * sqrt(3) / 2
+    # => if we want 2h = 1, radius = 1 / sqrt(3)
+    #
+    # https://www.redblobgames.com/grids/hexagons/
+    x = coord.q + (coord.r / 2)
+    y = (coord.r * 3 / 2) / _SQRT3
+    return (x, y)
