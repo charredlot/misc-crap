@@ -18,20 +18,23 @@ def index():
     return render_template("index.html", time=time.time())
 
 
+def _combat_step_json(combat, effects=None):
+    obj = combat_json(current_app.combat)
+    if effects is not None:
+        obj["effects"] = [effect_json(e) for e in effects]
+    return json.dumps(obj, indent=2)
+
+
 @bp.route("/combat_state")
 def combat_state():
     current_app.combat = get_combat()
-    return json.dumps(current_app.combat, default=combat_json, indent=2)
+    return _combat_step_json(current_app.combat)
 
 
 @bp.route("/combat_step")
 def combat_step():
-    curr_event, effects = current_app.combat.step()
-
-    obj = combat_json(current_app.combat)
-    obj["curr_event"] = curr_event.to_json()
-    obj["effects"] = [effect_json(e) for e in effects]
-    return json.dumps(obj, indent=2)
+    effects = current_app.combat.step()
+    return _combat_step_json(current_app.combat, effects)
 
 
 @bp.route("/move_coords/<unit_key>")
@@ -62,7 +65,4 @@ def move_active_unit(q, r):
     combat = current_app.combat
     effects = combat.process_command(MoveActiveUnitCommand(AxialCoord(q, r)))
 
-    obj = combat_json(combat)
-    obj["curr_event"] = combat.curr_event.to_json()
-    obj["effects"] = [effect_json(e) for e in effects]
-    return json.dumps(obj, indent=2)
+    return _combat_step_json(combat, effects)

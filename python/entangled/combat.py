@@ -36,7 +36,7 @@ class Combat:
 
         self.unit_key_to_next_turn: Dict[str, UnitTurnCombatEvent] = {}
 
-    def step(self) -> Tuple[CombatEvent, Iterable[CombatEventEffect]]:
+    def step(self) -> Iterable[CombatEventEffect]:
         if self.curr_event and not self.curr_event.is_done():
             raise Exception("{} needs commands".format(self.curr_event))
 
@@ -47,7 +47,7 @@ class Combat:
         effects = event.execute(self)
 
         self.curr_event = event
-        return event, effects
+        return effects
 
     def process_command(
         self, command: "CombatCommand"
@@ -137,6 +137,9 @@ def combat_json(combat):
             for unit_key, coord in combat.unit_key_to_coord.items()
         },
         "events": [e.to_json() for e in combat.event_queue],
+        "curr_event": combat.curr_event.to_json()
+        if combat.curr_event
+        else None,
     }
 
 
