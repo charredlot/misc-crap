@@ -1,4 +1,3 @@
-from urllib.parse import unquote
 import json
 import time
 
@@ -36,30 +35,6 @@ def combat_state():
 def combat_step():
     effects = current_app.combat.step()
     return _combat_step_json(current_app.combat, effects)
-
-
-@bp.route("/move_coords/<unit_key>")
-def move_coords(unit_key):
-    unit_key = unquote(unit_key)
-    combat = current_app.combat
-
-    return Response(
-        json.dumps(
-            [
-                {
-                    "q": coord.q,
-                    "r": coord.r,
-                    "path": [
-                        {"q": path_coord.q, "r": path_coord.r}
-                        for path_coord in path
-                    ],
-                }
-                for coord, path in combat.unit_move_coords(unit_key)
-            ],
-            indent=2,
-        ),
-        mimetype="application/json",
-    )
 
 
 @bp.route("/move_active_unit", methods=["POST"])

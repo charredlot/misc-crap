@@ -111,19 +111,19 @@ class Combat:
         self.event_queue.push(event)
 
     def unit_move_coords(
-        self, unit_key: str
+        self, unit: Unit, action_points: int
     ) -> Iterable[Tuple[AxialCoord, List[AxialCoord]]]:
         # tuple is coord and the shortest path from the unit to
         # the coord
+        unit_key = unit.key()
         center = self.unit_key_to_coord[unit_key]
-        next_turn = self.unit_key_to_next_turn[unit_key]
         # FIXME: this is actually broken because we need to know the action
         # point cost to make sure some of these paths make sense.
         return [
             (coord, path)
             for coord, path in (
                 (coord, self.grid.shortest_path(center, coord))
-                for coord in coords_circle(center, next_turn.action_points)
+                for coord in coords_circle(center, action_points)
                 if coord != center
             )
             if path

@@ -424,14 +424,7 @@ function handleEffect(effect, currEvent) {
     // this is probably going to be ugly
     switch (effect.key) {
         case "UnitTurnBeganEffect":
-            uiAjaxStart();
-            $.ajax({
-                url: "/move_coords/" + encodeURI(effect.unit_key),
-                success: function(result) {
-                    beginUnitTurn(effect, currEvent, result);
-                    uiAjaxFinish();
-                },
-            });
+            beginUnitTurn(effect, currEvent, effect.move_coords);
             break;
     }
 }

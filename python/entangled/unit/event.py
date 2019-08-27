@@ -24,7 +24,7 @@ class UnitTurnCombatEvent(CommandableCombatEvent):
 
     def execute(self, combat) -> Iterable[CombatEventEffect]:
         # UI needs to know that turn started
-        return (UnitTurnBeganEffect(self.unit),)
+        return (UnitTurnBeganEffect(self.unit, combat, self.action_points),)
 
     def affected_units(self):
         return (self.unit,)
@@ -42,8 +42,26 @@ class UnitTurnCombatEvent(CommandableCombatEvent):
 
 
 class UnitTurnBeganEffect(CombatEventEffect):
-    def __init__(self, unit):
+    def __init__(self, unit, combat, action_points):
         self.unit = unit
+        self.move_coords = combat.unit_move_coords(self.unit, action_points)
 
     def to_json(self):
-        return {"unit_key": self.unit.key(), "key": self.key()}
+        obj = super().to_json()
+        obj.update(
+            {
+                "unit_key": self.unit.key(),
+                "move_coords": [
+                    {
+                        "q": coord.q,
+                        "r": coord.r,
+                        "path": [
+                            {"q": path_coord.q, "r": path_coord.r}
+                            for path_coord in path
+                        ],
+                    }
+                    for coord, path in self.move_coords
+                ],
+            }
+        )
+        return obj
