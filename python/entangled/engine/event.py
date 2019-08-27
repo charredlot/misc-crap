@@ -14,9 +14,8 @@ class CombatEventEffect(ABC):
     def key(self):
         return type(self).__name__
 
-    @abstractmethod
     def to_json(self):
-        pass
+        return {"key": self.key()}
 
 
 class CombatEvent(ABC):
@@ -68,10 +67,10 @@ class CommandableCombatEvent(CombatEvent):
     ):
         super(CommandableCombatEvent, self).__init__(countdown, priority)
         self.unit = unit
+        self.done = False
 
     def is_done(self) -> bool:
-        # execute_command should make this eventually return True
-        return False
+        return self.done
 
 
 # using heapq makes changing the key value O(n) instead of O(log n) because the
@@ -122,3 +121,6 @@ class ErrorEffect(CombatEventEffect):
 
     def to_json(self):
         return {"error": self.error}
+
+    def __repr__(self):
+        return str(self.error)

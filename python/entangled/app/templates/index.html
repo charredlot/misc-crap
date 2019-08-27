@@ -10,7 +10,6 @@
 var UI_STATE_NONE = 1;
 var UI_STATE_AJAX = 2;
 var UI_STATE_MOVING = 3;
-var UI_STATE_MOVE_SELECTED = 4;
 
 var combat;
 var ui = {state: [UI_STATE_NONE]};
@@ -158,6 +157,15 @@ function uiStatePush(state) {
     ui.state.push(state);
 }
 
+function uiStatePop(expected) {
+    let popped = ui.state.pop();
+    if (expected && (expected !== popped)) {
+        console.log("ui state pop expected", expected,
+                    "got". popped,
+                    ui.state);
+    }
+}
+
 function uiAjaxStart() {
     ui.state.push(UI_STATE_AJAX);
 }
@@ -209,34 +217,31 @@ function setKeys(clickCanvas, hexRadius) {
 
         switch (uiState()) {
             case UI_STATE_MOVING:
+                // a map would be better but it's annoying to do the
+                // two-part lookup since javascript doesn't have
+                // tuple keys. could convert to a string but that's
+                // gross too.
+                let coord = ui.targetedCoords.find(function (coord) {
+                    return (coord.q === hex.q) && (coord.r === hex.r);
+                });
                 if (ui.selectedHex &&
                     (ui.selectedHex === hex) &&
                     ui.targetedHexes.includes(ui.selectedHex)) {
                     uiAjaxStart();
                     $.ajax({
-                        url: ("/move_active_unit/" +
-                              encodeURI(hex.q) +
-                              "/" +
-                              encodeURI(hex.r)),
-                        success: function(result) {
-                            // XXX: update the display and handle effects
-                            let newState = JSON.parse(result);
-                            console.log("move to", newState);
-                            uiAjaxFinish();
-                        },
+                        type: "POST",
+                        url: "/move_active_unit",
+                        contentType: "application/json",
+                        dataType: "json",
+                        data: JSON.stringify({
+                            path: coord.path
+                                ? coord.path
+                                : [coord]}),
+                        success: ajaxHandleCombatStep,
                     });
                 } else {
-                    if (ui.targetedCoords) {
-                        // a map would be better but it's annoying to do the
-                        // two-part lookup since javascript doesn't have
-                        // tuple keys. could convert to a string but that's
-                        // gross too.
-                        let coord = ui.targetedCoords.find(function (coord) {
-                            return (coord.q === hex.q) && (coord.r === hex.r);
-                        });
-                        if (coord && coord.path) {
-                            drawHexPath(coord.path);
-                        }
+                    if (coord && coord.path) {
+                        drawHexPath(coord.path);
                     }
                     selectHex(hex, true);
                     redraw();
@@ -424,10 +429,8 @@ function handleEffect(effect, currEvent) {
     }
 }
 
-function ajaxHandleCombatStep(step_result) {
+function ajaxHandleCombatStep(step) {
     // always call uiAjaxStart before the ajax call
-    let step = JSON.parse(step_result);
-
     console.log("step:", step);
 
     step.effects.forEach(function(effect) {
@@ -443,7 +446,9 @@ function combatStep() {
     uiAjaxStart();
     $.ajax({
         url: "/combat_step",
-        success: ajaxHandleCombatStep,
+        success: function (result) {
+            ajaxHandleCombatStep(JSON.parse(result));
+        },
     });
 }
 

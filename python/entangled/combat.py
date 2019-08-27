@@ -76,17 +76,29 @@ class Combat:
                 )
             )
 
-        if coord in self.coord_to_unit_key:
+        self.move_unit(unit, coord)
+        self.push_turn_event(unit, UnitTurnCombatEvent(unit))
+
+    def move_unit(self, unit: Unit, dst: AxialCoord):
+        """
+        Doesn't do any checks besides destination having a unit.
+        Other checks are up to caller, e.g. reachability
+        """
+        unit_key = unit.key()
+
+        src = self.unit_key_to_coord.get(unit_key)
+        if src:
+            del self.coord_to_unit_key[src]
+
+        if dst in self.coord_to_unit_key:
             raise Exception(
                 "another unit {} already at {}".format(
-                    self.coord_to_unit_key[coord], coord
+                    self.coord_to_unit_key[dst], dst
                 )
             )
 
-        self.unit_key_to_coord[unit_key] = coord
-        self.coord_to_unit_key[coord] = unit_key
-
-        self.push_turn_event(unit, UnitTurnCombatEvent(unit))
+        self.unit_key_to_coord[unit_key] = dst
+        self.coord_to_unit_key[dst] = unit_key
 
     def push_turn_event(self, unit: Unit, turn: UnitTurnCombatEvent):
         self.unit_key_to_next_turn[unit.key()] = turn
@@ -149,27 +161,69 @@ class CombatCommand(Command):
         return ()
 
 
+class MovedUnitEffect(CombatEventEffect):
+    def __init__(self, src: AxialCoord, dst: AxialCoord):
+        self.src = src
+        self.dst = dst
+
+    def to_json(self):
+        obj = super().to_json()
+        obj["src"] = self.src
+        obj["dst"] = self.dst
+        return obj
+
+
 class MoveActiveUnitCommand(CombatCommand):
     """
     This is a normal move
     """
 
-    def __init__(self, dest: AxialCoord):
-        self.dest = dest
+    def __init__(self, path: List[AxialCoord]):
+        self.path = path
 
     def apply(self, combat: Combat) -> Iterable[CombatEventEffect]:
-        if not isinstance(combat.curr_event, UnitTurnCombatEvent):
+        turn = combat.curr_event
+        if not isinstance(turn, UnitTurnCombatEvent):
             return (
                 ErrorEffect(
                     "{} is not a UnitTurnCombatEvent".format(combat.curr_event)
                 ),
             )
 
-        dest_tile = combat.grid.get(self.dest)
-        if not dest_tile:
-            return (ErrorEffect("{} not in grid".format(self.dest)),)
+        if not self.path:
+            return (ErrorEffect("can't move a unit with an empty path"),)
 
-        # unit = self.curr_event.unit
-        # src_tile = combat.unit_key_to_coord.get[unit.key()]
-        # XXX: do path stuff here
-        return ()
+        effects = []
+        prev_coord = combat.unit_key_to_coord[turn.unit.key()]
+        for coord in self.path:
+            if prev_coord == coord:
+                # eh could be an error but just skip redundant coords
+                continue
+
+            if coord not in combat.grid:
+                return (ErrorEffect("{} not in grid".format(coord)),)
+
+            cost = combat.grid.get_edge_weight(prev_coord, coord)
+            if cost is None:
+                return (
+                    ErrorEffect(
+                        "{} not reachable from {}".format(coord, prev_coord)
+                    ),
+                )
+            elif cost > turn.action_points:
+                return (ErrorEffect("not enough action points left"),)
+
+            try:
+                combat.move_unit(turn.unit, coord)
+            except Exception as e:
+                return (ErrorEffect(str(e)),)
+
+            effects.append(MovedUnitEffect(prev_coord, coord))
+
+            turn.action_points -= cost
+            if turn.action_points == 0:
+                break
+
+            prev_coord = coord
+
+        return effects

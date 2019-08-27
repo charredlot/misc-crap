@@ -2,7 +2,7 @@ from urllib.parse import unquote
 import json
 import time
 
-from flask import Blueprint, current_app, render_template
+from flask import Blueprint, current_app, render_template, request
 
 from app.game import get_combat
 from combat import combat_json, MoveActiveUnitCommand
@@ -21,6 +21,7 @@ def index():
 def _combat_step_json(combat, effects=None):
     obj = combat_json(current_app.combat)
     if effects is not None:
+        print(effects)
         obj["effects"] = [effect_json(e) for e in effects]
     return json.dumps(obj, indent=2)
 
@@ -58,11 +59,12 @@ def move_coords(unit_key):
     )
 
 
-@bp.route("/move_active_unit/<q>/<r>")
-def move_active_unit(q, r):
-    q = int(q)
-    r = int(r)
+@bp.route("/move_active_unit", methods=["POST"])
+def move_active_unit():
+    path = [
+        AxialCoord(coord["q"], coord["r"]) for coord in request.json["path"]
+    ]
     combat = current_app.combat
-    effects = combat.process_command(MoveActiveUnitCommand(AxialCoord(q, r)))
+    effects = combat.process_command(MoveActiveUnitCommand(path))
 
     return _combat_step_json(combat, effects)

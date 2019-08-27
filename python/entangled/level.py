@@ -1,6 +1,6 @@
 from collections import defaultdict, deque, namedtuple
 from math import gcd, sqrt
-from typing import Deque, Dict, Iterable, List, Set, Tuple
+from typing import Deque, Dict, Iterable, List, Optional, Set, Tuple
 
 
 AxialCoord = namedtuple("AxialCoord", ["q", "r"])
@@ -53,6 +53,14 @@ class HexGrid:
             return []
 
         return list(adjacent)
+
+    def get_edge_weight(
+        self, src: AxialCoord, dst: AxialCoord
+    ) -> Optional[int]:
+        try:
+            return self.adjacencies[src][dst]
+        except KeyError:
+            return None
 
     def edges(self):
         # dunno if this will be useful
