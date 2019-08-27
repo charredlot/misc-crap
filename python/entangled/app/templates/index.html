@@ -9,7 +9,8 @@
 "use strict";
 var UI_STATE_NONE = 1;
 var UI_STATE_AJAX = 2;
-var UI_STATE_MOVING = 3;
+var UI_STATE_ANIMATING = 3;
+var UI_STATE_MOVING = 4;
 
 var combat;
 var ui = {state: [UI_STATE_NONE]};
@@ -150,6 +151,11 @@ function uiState() {
     return ui.state[ui.state.length - 1];
 }
 
+function uiStateNoInput() {
+    let state = uiState();
+    return (state === UI_STATE_AJAX) || (state === UI_STATE_ANIMATING);
+}
+
 function uiStatePush(state) {
     if ((state !== UI_STATE_AJAX) && (uiState() === UI_STATE_AJAX)) {
         console.log("ui state push error", state, ui.state);
@@ -195,7 +201,7 @@ function setKeys(clickCanvas, hexRadius) {
 
         console.log(evt.keyCode, evt.code);
 
-        if (uiState() === UI_STATE_AJAX) {
+        if (uiStateNoInput()) {
             return;
         }
 
@@ -237,7 +243,9 @@ function setKeys(clickCanvas, hexRadius) {
                             path: coord.path
                                 ? coord.path
                                 : [coord]}),
-                        success: ajaxHandleCombatStep,
+                        success: function(result) {
+                            ajaxHandleCombatStep(result);
+                        },
                     });
                 } else {
                     if (coord && coord.path) {
@@ -395,7 +403,7 @@ function beginUnitTurn(effect, currEvent, moveCoords) {
     let newAction = domActionTemplate.clone();
     newAction.text("Move");
     newAction.click(function(evt) {
-        if (uiState() === UI_STATE_AJAX) {
+        if (uiStateNoInput()) {
             return;
         }
 
@@ -420,8 +428,7 @@ function handleEffect(effect, currEvent) {
             $.ajax({
                 url: "/move_coords/" + encodeURI(effect.unit_key),
                 success: function(result) {
-                    let moveCoords = JSON.parse(result);
-                    beginUnitTurn(effect, currEvent, moveCoords);
+                    beginUnitTurn(effect, currEvent, result);
                     uiAjaxFinish();
                 },
             });
@@ -439,7 +446,6 @@ function ajaxHandleCombatStep(step) {
 
     // TODO: handle redrawing grid and unit changes
     redrawEventQueue(step.curr_event, step.events);
-    uiAjaxFinish();
 }
 
 function combatStep() {
@@ -447,7 +453,8 @@ function combatStep() {
     $.ajax({
         url: "/combat_step",
         success: function (result) {
-            ajaxHandleCombatStep(JSON.parse(result));
+            ajaxHandleCombatStep(result);
+            uiAjaxFinish();
         },
     });
 }
@@ -572,7 +579,7 @@ function onLoad() {
     $.ajax({
         url: "/combat_state",
         success: function(result) {
-            combat = JSON.parse(result);
+            combat = result;
 
             let tileToHexInfo = function(tile, hex) {
                 if (!tile.unit_key) {

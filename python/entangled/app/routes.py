@@ -2,7 +2,7 @@ from urllib.parse import unquote
 import json
 import time
 
-from flask import Blueprint, current_app, render_template, request
+from flask import Blueprint, current_app, render_template, request, Response
 
 from app.game import get_combat
 from combat import combat_json, MoveActiveUnitCommand
@@ -23,7 +23,7 @@ def _combat_step_json(combat, effects=None):
     if effects is not None:
         print(effects)
         obj["effects"] = [effect_json(e) for e in effects]
-    return json.dumps(obj, indent=2)
+    return Response(json.dumps(obj, indent=2), mimetype="application/json")
 
 
 @bp.route("/combat_state")
@@ -43,19 +43,22 @@ def move_coords(unit_key):
     unit_key = unquote(unit_key)
     combat = current_app.combat
 
-    return json.dumps(
-        [
-            {
-                "q": coord.q,
-                "r": coord.r,
-                "path": [
-                    {"q": path_coord.q, "r": path_coord.r}
-                    for path_coord in path
-                ],
-            }
-            for coord, path in combat.unit_move_coords(unit_key)
-        ],
-        indent=2,
+    return Response(
+        json.dumps(
+            [
+                {
+                    "q": coord.q,
+                    "r": coord.r,
+                    "path": [
+                        {"q": path_coord.q, "r": path_coord.r}
+                        for path_coord in path
+                    ],
+                }
+                for coord, path in combat.unit_move_coords(unit_key)
+            ],
+            indent=2,
+        ),
+        mimetype="application/json",
     )
 
 
