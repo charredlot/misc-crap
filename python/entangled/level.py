@@ -142,7 +142,7 @@ class HexGrid:
                             # this is a bit hacky, but we're just trying to
                             # prefer keeping in the same direction without
                             # biasing towards unoptimal paths
-                            h_score += 0.1
+                            h_score *= 1.5
                     f_score[neighbor] = tentative_g_score + h_score
 
                 open_set.add(neighbor)
