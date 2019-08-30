@@ -11,7 +11,7 @@ from engine.event import (
     CommandableCombatEvent,
     ErrorEffect,
 )
-from level import AxialCoord, coords_circle, HexGrid
+from level import axial_json, AxialCoord, coords_circle, HexGrid
 from unit import Unit, unit_json
 from unit.event import UnitTurnCombatEvent
 from util import to_json
@@ -162,14 +162,24 @@ class CombatCommand(Command):
 
 
 class MovedUnitEffect(CombatEventEffect):
-    def __init__(self, src: AxialCoord, dst: AxialCoord):
+    def __init__(
+        self, unit_key: str, src: AxialCoord, dst: AxialCoord, ap_cost: int
+    ):
+        self.unit_key = unit_key
         self.src = src
         self.dst = dst
+        self.ap_cost = ap_cost
 
     def to_json(self):
         obj = super().to_json()
-        obj["src"] = self.src
-        obj["dst"] = self.dst
+        obj.update(
+            {
+                "unit_key": self.unit_key,
+                "src": axial_json(self.src),
+                "dst": axial_json(self.dst),
+                "ap_cost": self.ap_cost,
+            }
+        )
         return obj
 
 
@@ -194,7 +204,8 @@ class MoveActiveUnitCommand(CombatCommand):
             return (ErrorEffect("can't move a unit with an empty path"),)
 
         effects = []
-        prev_coord = combat.unit_key_to_coord[turn.unit.key()]
+        unit_key = turn.unit.key()
+        prev_coord = combat.unit_key_to_coord[unit_key]
         for coord in self.path:
             if prev_coord == coord:
                 # eh could be an error but just skip redundant coords
@@ -218,7 +229,7 @@ class MoveActiveUnitCommand(CombatCommand):
             except Exception as e:
                 return (ErrorEffect(str(e)),)
 
-            effects.append(MovedUnitEffect(prev_coord, coord))
+            effects.append(MovedUnitEffect(unit_key, prev_coord, coord, cost))
 
             turn.action_points -= cost
             if turn.action_points == 0:

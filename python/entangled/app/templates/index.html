@@ -13,7 +13,11 @@ var UI_STATE_ANIMATING = 3;
 var UI_STATE_MOVING = 4;
 
 var combat;
-var ui = {state: [UI_STATE_NONE]};
+var ui = {
+    state: [UI_STATE_NONE],
+    animations: null,
+    animationID: null,
+};
 
 var center = {x: 0, y: 0};
 var cameraOffset = {dx: 0, dy: 0};
@@ -39,7 +43,8 @@ var LAYER_GRID_TARGET_PATH = 2;
 var LAYER_GRID_SELECT = 3;
 var LAYER_GRID_DEBUG = 4;
 var LAYER_UNIT = 5;
-var LAYER_COUNT = 6;
+var LAYER_UNIT_ANIMATION = 6;
+var LAYER_COUNT = 7;
 
 var domActiveUnitName;
 var domActiveUnitAP;
@@ -160,6 +165,7 @@ function uiStatePush(state) {
     if ((state !== UI_STATE_AJAX) && (uiState() === UI_STATE_AJAX)) {
         console.log("ui state push error", state, ui.state);
     }
+    console.log("ui state pushed:", state);
     ui.state.push(state);
 }
 
@@ -170,16 +176,109 @@ function uiStatePop(expected) {
                     "got". popped,
                     ui.state);
     }
+    console.log("ui state popped:", popped);
+    return popped;
 }
 
 function uiAjaxStart() {
-    ui.state.push(UI_STATE_AJAX);
+    uiStatePush(UI_STATE_AJAX);
 }
 
 function uiAjaxFinish() {
-    let state = ui.state.pop();
-    if (state !== UI_STATE_AJAX) {
-        console.log("ui state ajax finish error", state, ui.state);
+    uiStatePop(UI_STATE_AJAX);
+
+    if (ui.animations && (ui.animations.length > 0)) {
+        uiStatePush(UI_STATE_ANIMATING);
+        ui.animationID = window.requestAnimationFrame(uiAnimationFrame);
+    }
+}
+
+function pixelAdvanceLinear(x, y, dx, dy, dstX, dstY) {
+    let reachedX = false;
+    let reachedY = false;
+    let newX = x + dx;
+    let newY = y + dy;
+    let distX = newX - dstX;
+    let distY = newY - dstY;
+
+    // check if we overshot since floats are blah
+    reachedX = ((dx > 0) && (distX > 0)) ||
+               ((dx < 0) && (distX < 0)) ||
+               (Math.abs(newX - x) < 1);
+    reachedY = ((dy > 0) && (distY > 0)) ||
+               ((dy < 0) && (distY < 0)) ||
+               (Math.abs(newY - y) < 1);
+    return {
+        x: newX,
+        y: newY,
+        reached: reachedX && reachedY,
+    };
+}
+
+function uiAnimationFrame(timestamp) {
+    let effect = ui.animations[0];
+    let done = false;
+
+    switch (effect.key) {
+        case "MovedUnitEffect":
+            let layer = canvasLayers[LAYER_UNIT_ANIMATION];
+            let ctx = layer.ctx;
+
+            if (!effect.unit) {
+                effect.unit = combat.units[effect.unit_key];
+                console.assert(effect.unit, "no unit found", effect);
+            }
+
+            if (!effect.src_hex) {
+                effect.src_hex = hexFromAxial(effect.src.q, effect.src.r);
+                undrawUnitAtHex(effect.unit, effect.src_hex);
+                effect.x = effect.src_hex.center.x;
+                effect.y = effect.src_hex.center.y;
+                console.assert(effect.src_hex, "src hex", effect.src);
+            }
+
+            if (!effect.dst_hex) {
+                effect.dst_hex = hexFromAxial(effect.dst.q, effect.dst.r);
+
+                effect.dx = effect.dst_hex.center.x - effect.x;
+                effect.dy = effect.dst_hex.center.y - effect.y;
+
+                let norm = Math.sqrt((effect.dx * effect.dx) +
+                                     (effect.dy * effect.dy));
+                effect.dx = effect.dx / norm;
+                effect.dy = effect.dy / norm;
+
+                console.assert(effect.dst_hex, "dst hex", effect.dst);
+            }
+
+            let scale = 5;
+            let result = pixelAdvanceLinear(effect.x,
+                                            effect.y,
+                                            effect.dx * scale,
+                                            effect.dy * scale,
+                                            effect.dst_hex.center.x,
+                                            effect.dst_hex.center.y);
+            effect.x = result.x;
+            effect.y = result.y;
+
+            ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
+            drawUnit(ctx, effect.x, effect.y, unitColor(effect.unit));
+
+            done = result.reached;
+            break;
+    }
+
+    redraw();
+
+    if (done) {
+        ui.animations.shift();
+    }
+
+    if (ui.animations.length > 0) {
+        ui.animationID = window.requestAnimationFrame(uiAnimationFrame);
+    } else {
+        ui.animationID = null;
+        uiStatePop(UI_STATE_ANIMATING);
     }
 }
 
@@ -201,10 +300,6 @@ function setKeys(clickCanvas, hexRadius) {
 
         console.log(evt.keyCode, evt.code);
 
-        if (uiStateNoInput()) {
-            return;
-        }
-
         let prevCameraOffset = Object.assign({}, cameraOffset);
         f();
         if ((prevCameraOffset.dx !== cameraOffset.dx) ||
@@ -212,6 +307,8 @@ function setKeys(clickCanvas, hexRadius) {
             redraw();
         }
 
+        // allow camera movements but check uiStateNoInput() if other
+        // keys are added later
     });
 
 
@@ -245,6 +342,7 @@ function setKeys(clickCanvas, hexRadius) {
                                 : [coord]}),
                         success: function(result) {
                             ajaxHandleCombatStep(result);
+                            uiAjaxFinish();
                         },
                     });
                 } else {
@@ -257,6 +355,9 @@ function setKeys(clickCanvas, hexRadius) {
                 break;
             case UI_STATE_AJAX:
                 // no clicks while waiting for an ajax request to finish
+                break;
+            case UI_STATE_ANIMATING:
+                // no clicks while animating
                 break;
             default:
                 selectHex(hex);
@@ -319,6 +420,10 @@ function clearHex(ctx, vertices) {
     ctx.globalCompositeOperation = op;
 }
 
+function unitColor(unit) {
+    return (unit.friendly ? "#2088ff" : "red");
+}
+
 function drawUnit(ctx, centerX, centerY, fillStyle) {
     ctx.beginPath();
     ctx.arc(centerX,
@@ -328,6 +433,22 @@ function drawUnit(ctx, centerX, centerY, fillStyle) {
             2 * Math.PI);
     ctx.fillStyle = fillStyle;
     ctx.fill();
+}
+
+function drawUnitAtHex(unit, hex) {
+    drawUnit(canvasLayers[LAYER_UNIT].ctx,
+             hex.center.x,
+             hex.center.y,
+             unitColor(hex.unit));
+}
+
+function undrawUnitAtHex(unit, hex) {
+    let ctx = canvasLayers[LAYER_UNIT].ctx;
+
+    let op = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'destination-out';
+    drawUnit(ctx, hex.center.x, hex.center.y, "black");
+    ctx.globalCompositeOperation = op;
 }
 
 function initLayers(width, height) {
@@ -381,6 +502,14 @@ function drawTargetedHexes(newCoords, oldHexes) {
     return targeted;
 }
 
+function updateActiveUnitActionPoints() {
+    let ap = "AP: ";
+    for (let i = 0; i < combat.curr_event.action_points; i++) {
+        ap += "\u2022 ";
+    }
+    domActiveUnitAP.text(ap);
+}
+
 // a bit ugly because we're using the async call to find the moveable hexes
 function beginUnitTurn(effect, currEvent, moveCoords) {
     let coord = combat.unit_key_to_coord[effect.unit_key];
@@ -393,11 +522,7 @@ function beginUnitTurn(effect, currEvent, moveCoords) {
 
     // action points on this turn might be different from the unit's
     // typical amount
-    let ap = "AP: ";
-    for (let i = 0; i < currEvent.action_points; i++) {
-        ap += "\u2022 ";
-    }
-    domActiveUnitAP.text(ap);
+    updateActiveUnitActionPoints();
 
     domActiveUnitActions.empty();
     let newAction = domActionTemplate.clone();
@@ -420,11 +545,22 @@ function beginUnitTurn(effect, currEvent, moveCoords) {
     ui.activeUnit = unit;
 }
 
+function queueMoveAnimation(effect) {
+    if (!ui.animations) {
+        ui.animations = [];
+    }
+
+    ui.animations.push(effect);
+}
+
 function handleEffect(effect, currEvent) {
     // this is probably going to be ugly
     switch (effect.key) {
         case "UnitTurnBeganEffect":
             beginUnitTurn(effect, currEvent, effect.move_coords);
+            break;
+        case "MovedUnitEffect":
+            queueMoveAnimation(effect);
             break;
     }
 }
@@ -433,12 +569,17 @@ function ajaxHandleCombatStep(step) {
     // always call uiAjaxStart before the ajax call
     console.log("step:", step);
 
+
+    redrawEventQueue(step.curr_event, step.events);
+
+    // save effects for debugging
+    combat.effects = step.effects;
+    combat.curr_event = step.curr_event;
+    combat.events = step.event;
+
     step.effects.forEach(function(effect) {
         handleEffect(effect, step.curr_event);
     });
-
-    // TODO: handle redrawing grid and unit changes
-    redrawEventQueue(step.curr_event, step.events);
 }
 
 function combatStep() {
@@ -534,12 +675,7 @@ function drawGridOnLayers(grid) {
                     "#00bb22");
 
             if (hex.unit) {
-                drawUnit(canvasLayers[LAYER_UNIT].ctx,
-                         hex.center.x,
-                         hex.center.y,
-                         (hex.unit.friendly ?
-                          "#2088ff" :
-                          "red"));
+                drawUnitAtHex(hex.unit, hex);
             }
 
             // XXX: this is debugging, remove later
