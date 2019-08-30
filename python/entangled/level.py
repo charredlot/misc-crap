@@ -222,3 +222,7 @@ def axial_to_cartesian(coord: AxialCoord) -> Tuple[float, float]:
     x = coord.q + (coord.r / 2)
     y = (coord.r * 3 / 2) / _SQRT3
     return (x, y)
+
+
+def axial_json(coord: AxialCoord) -> Dict[str, int]:
+    return {"q": coord.q, "r": coord.r}
