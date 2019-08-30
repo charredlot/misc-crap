@@ -5,7 +5,6 @@ from flask import Blueprint, current_app, render_template, request, Response
 
 from app.game import get_combat
 from combat import combat_json, MoveActiveUnitCommand
-from engine.event import effect_json
 from level import AxialCoord
 
 
@@ -20,8 +19,7 @@ def index():
 def _combat_step_json(combat, effects=None):
     obj = combat_json(current_app.combat)
     if effects is not None:
-        print(effects)
-        obj["effects"] = [effect_json(e) for e in effects]
+        obj["effects"] = [e.to_json() for e in effects]
     return Response(json.dumps(obj, indent=2), mimetype="application/json")
 
 

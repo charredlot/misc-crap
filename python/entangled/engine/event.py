@@ -3,8 +3,6 @@ from typing import Iterable
 
 import heapq
 
-from util import to_json
-
 
 class CombatEventEffect(ABC):
     """
@@ -108,11 +106,6 @@ class CombatEventQueue:
         while events:
             t = heapq.heappop(events)
             yield t[-1]
-
-
-@to_json.register(CombatEventEffect)
-def effect_json(effect):
-    return effect.to_json()
 
 
 class ErrorEffect(CombatEventEffect):
