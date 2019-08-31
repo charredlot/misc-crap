@@ -10,13 +10,17 @@
 "use strict";
 var UI_STATE_NONE = 1;
 var UI_STATE_AJAX = 2;
+// in UI_STATE_ANIMATING, we've passed control to the requestAnimationFrame
+// callbacks. keep it mutually exclusive with other parts of the UI to avoid
+// races
 var UI_STATE_ANIMATING = 3;
 var UI_STATE_MOVING = 4;
 
 var combat;
 var ui = {
     state: [UI_STATE_NONE],
-    animations: null,
+    pendingEffects: null,
+    // the ID from the requestAnimationFrame call
     animationID: null,
 };
 
@@ -195,7 +199,7 @@ function uiAjaxStart() {
 function uiAjaxFinish() {
     uiStatePop(UI_STATE_AJAX);
 
-    if (ui.animations && (ui.animations.length > 0)) {
+    if (ui.pendingEffects && (ui.pendingEffects.length > 0)) {
         uiStatePush(UI_STATE_ANIMATING);
         ui.animationID = window.requestAnimationFrame(uiAnimationFrame);
     }
@@ -224,10 +228,14 @@ function pixelAdvanceLinear(x, y, dx, dy, dstX, dstY) {
 }
 
 function uiAnimationFrame(timestamp) {
-    let effect = ui.animations[0];
+    let effect = ui.pendingEffects[0];
     let done = false;
 
     switch (effect.key) {
+        case "UnitTurnBeganEffect":
+            beginUnitTurn(effect, effect.move_coords);
+            done = true;
+            break;
         case "MovedActiveUnitEffect":
             let layer = canvasLayers[LAYER_UNIT_ANIMATION];
             let ctx = layer.ctx;
@@ -273,19 +281,16 @@ function uiAnimationFrame(timestamp) {
             drawUnit(ctx, effect.x, effect.y, unitColor(effect.unit));
 
             done = result.reached;
-            if (result.reached && effect.move_done) {
-                clearLayer(LAYER_GRID_TARGET_PATH);
-            }
             break;
     }
 
     redraw();
 
     if (done) {
-        ui.animations.shift();
+        ui.pendingEffects.shift();
     }
 
-    if (ui.animations.length > 0) {
+    if (ui.pendingEffects.length > 0) {
         ui.animationID = window.requestAnimationFrame(uiAnimationFrame);
     } else {
         ui.animationID = null;
@@ -342,7 +347,6 @@ function setKeys(clickCanvas, hexRadius) {
                     (ui.selectedHex === hex) &&
                     ui.targetedHexes.includes(ui.selectedHex)) {
                     uiStatePop(UI_STATE_MOVING);
-                    clearLayer(LAYER_GRID_TARGET);
                     uiAjaxStart();
                     $.ajax({
                         type: "POST",
@@ -524,7 +528,7 @@ function updateActiveUnitActionPoints() {
 }
 
 // a bit ugly because we're using the async call to find the moveable hexes
-function beginUnitTurn(effect, currEvent, moveCoords) {
+function beginUnitTurn(effect, moveCoords) {
     let coord = combat.unit_key_to_coord[effect.unit_key];
     let hex = combat.grid[coord.q][coord.r];
     let unit = hex.unit;
@@ -560,28 +564,11 @@ function beginUnitTurn(effect, currEvent, moveCoords) {
     domActiveUnitActions.append(newAction);
     newAction.show();
 
+    clearLayer(LAYER_GRID_TARGET);
+    clearLayer(LAYER_GRID_TARGET_PATH);
+
     ui.targetedCoords = moveCoords;
     ui.activeUnit = unit;
-}
-
-function queueMoveAnimation(effect) {
-    if (!ui.animations) {
-        ui.animations = [];
-    }
-
-    ui.animations.push(effect);
-}
-
-function handleEffect(effect, currEvent) {
-    // this is probably going to be ugly
-    switch (effect.key) {
-        case "UnitTurnBeganEffect":
-            beginUnitTurn(effect, currEvent, effect.move_coords);
-            break;
-        case "MovedActiveUnitEffect":
-            queueMoveAnimation(effect);
-            break;
-    }
 }
 
 function ajaxHandleCombatStep(step) {
@@ -596,9 +583,7 @@ function ajaxHandleCombatStep(step) {
     combat.curr_event = step.curr_event;
     combat.events = step.event;
 
-    step.effects.forEach(function(effect) {
-        handleEffect(effect, combat.curr_event);
-    });
+    ui.pendingEffects = step.effects;
 }
 
 function combatStep() {
