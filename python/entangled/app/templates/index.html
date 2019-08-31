@@ -220,7 +220,7 @@ function uiAnimationFrame(timestamp) {
     let done = false;
 
     switch (effect.key) {
-        case "MovedUnitEffect":
+        case "MovedActiveUnitEffect":
             let layer = canvasLayers[LAYER_UNIT_ANIMATION];
             let ctx = layer.ctx;
 
@@ -559,7 +559,7 @@ function handleEffect(effect, currEvent) {
         case "UnitTurnBeganEffect":
             beginUnitTurn(effect, currEvent, effect.move_coords);
             break;
-        case "MovedUnitEffect":
+        case "MovedActiveUnitEffect":
             queueMoveAnimation(effect);
             break;
     }
@@ -578,7 +578,7 @@ function ajaxHandleCombatStep(step) {
     combat.events = step.event;
 
     step.effects.forEach(function(effect) {
-        handleEffect(effect, step.curr_event);
+        handleEffect(effect, combat.curr_event);
     });
 }
 

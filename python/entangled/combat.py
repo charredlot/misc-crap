@@ -161,7 +161,7 @@ class CombatCommand(Command):
         return ()
 
 
-class MovedUnitEffect(CombatEventEffect):
+class MovedActiveUnitEffect(CombatEventEffect):
     def __init__(
         self, unit_key: str, src: AxialCoord, dst: AxialCoord, ap_cost: int
     ):
@@ -229,7 +229,9 @@ class MoveActiveUnitCommand(CombatCommand):
             except Exception as e:
                 return (ErrorEffect(str(e)),)
 
-            effects.append(MovedUnitEffect(unit_key, prev_coord, coord, cost))
+            effects.append(
+                MovedActiveUnitEffect(unit_key, prev_coord, coord, cost)
+            )
 
             turn.action_points -= cost
             if turn.action_points == 0:
