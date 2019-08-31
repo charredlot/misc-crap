@@ -13,7 +13,7 @@ from engine.event import (
 )
 from level import axial_json, AxialCoord, coords_circle, HexGrid
 from unit import Unit, unit_json
-from unit.event import UnitTurnCombatEvent
+from unit.event import UnitTurnBeganEffect, UnitTurnCombatEvent
 from util import to_json
 
 
@@ -203,7 +203,7 @@ class MoveActiveUnitCommand(CombatCommand):
         if not self.path:
             return (ErrorEffect("can't move a unit with an empty path"),)
 
-        effects = []
+        effects: List[CombatEventEffect] = []
         unit_key = turn.unit.key()
         prev_coord = combat.unit_key_to_coord[unit_key]
         for coord in self.path:
@@ -239,4 +239,7 @@ class MoveActiveUnitCommand(CombatCommand):
 
             prev_coord = coord
 
+        effects.append(
+            UnitTurnBeganEffect(turn.unit, combat, turn.action_points)
+        )
         return effects
