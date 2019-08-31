@@ -127,6 +127,13 @@ function clickToHex(evt) {
     return hexFromAxial(q, r);
 }
 
+function clearLayer(layer_num) {
+    let layer = canvasLayers[layer_num];
+    let ctx = layer.ctx;
+
+    ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
+}
+
 function drawHexPath(path) {
     // draws a line connecting the centers of each hex in path
     let layer = canvasLayers[LAYER_GRID_TARGET_PATH];
@@ -265,6 +272,9 @@ function uiAnimationFrame(timestamp) {
             drawUnit(ctx, effect.x, effect.y, unitColor(effect.unit));
 
             done = result.reached;
+            if (result.reached && effect.move_done) {
+                clearLayer(LAYER_GRID_TARGET_PATH);
+            }
             break;
     }
 
@@ -330,6 +340,8 @@ function setKeys(clickCanvas, hexRadius) {
                 if (ui.selectedHex &&
                     (ui.selectedHex === hex) &&
                     ui.targetedHexes.includes(ui.selectedHex)) {
+                    uiStatePop(UI_STATE_MOVING);
+                    clearLayer(LAYER_GRID_TARGET);
                     uiAjaxStart();
                     $.ajax({
                         type: "POST",
