@@ -4,6 +4,7 @@
         <link rel="stylesheet" href="/static/index.css?nocache={{ time }}">
 
         <script src="/static/jquery.3.4.1.min.js"></script>
+        <script src="/static/colors.js?nocache={{ time }}"></script>
 
         <script>
 "use strict";
@@ -544,10 +545,16 @@ function beginUnitTurn(effect, currEvent, moveCoords) {
             return;
         }
 
-        newAction.css("background", "#ea80ff");
-
-        ui.targetedHexes = drawTargetedHexes(moveCoords, ui.targetedHexes);
-        uiStatePush(UI_STATE_MOVING);
+        if (uiState() === UI_STATE_MOVING) {
+            newAction.css("background", COLOR_ACTION_BUTTON);
+            clearLayer(LAYER_GRID_TARGET);
+            clearLayer(LAYER_GRID_TARGET_PATH);
+            uiStatePop(UI_STATE_MOVING);
+        } else {
+            newAction.css("background", COLOR_ACTION_BUTTON_ACTIVE);
+            ui.targetedHexes = drawTargetedHexes(moveCoords, ui.targetedHexes);
+            uiStatePush(UI_STATE_MOVING);
+        }
         redraw();
     });
     domActiveUnitActions.append(newAction);

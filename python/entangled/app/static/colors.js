@@ -1,0 +1,2 @@
+var COLOR_ACTION_BUTTON = "#2a51fa";
+var COLOR_ACTION_BUTTON_ACTIVE = "#ea80ff";
