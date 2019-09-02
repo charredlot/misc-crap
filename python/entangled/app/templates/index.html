@@ -25,7 +25,7 @@ var ui = {
 };
 
 var center = {x: 0, y: 0};
-var cameraOffset = {dx: 0, dy: 0};
+var cameraOffset = {dx: 0, dy: 0, scaleX: 1, scaleY: 1};
 var sqrt3 = Math.sqrt(3);
 var halfSqrt3 = Math.sqrt(3) / 2;
 
@@ -65,7 +65,11 @@ var colorActionSelected;
 function redraw() {
     viewportCtx.clearRect(0, 0, viewport.width, viewport.height);
     canvasLayers.forEach(function(layer) {
-        viewportCtx.drawImage(layer.canvas, cameraOffset.dx, cameraOffset.dy);
+        viewportCtx.drawImage(layer.canvas,
+                              cameraOffset.dx,
+                              cameraOffset.dy,
+                              layer.canvas.width * cameraOffset.scaleX,
+                              layer.canvas.height * cameraOffset.scaleY);
     });
 }
 
@@ -298,33 +302,59 @@ function uiAnimationFrame(timestamp) {
     }
 }
 
+function updateCamera(cameraModify) {
+    let prevCameraOffset = Object.assign({}, cameraOffset);
+    cameraModify(cameraOffset);
+    if ((prevCameraOffset.dx !== cameraOffset.dx) ||
+        (prevCameraOffset.dy !== cameraOffset.dy) ||
+        (prevCameraOffset.scaleX !== cameraOffset.scaleX) ||
+        (prevCameraOffset.scaleY !== cameraOffset.scaleY)) {
+        redraw();
+    }
+
+}
+
 function setKeys(clickCanvas, hexRadius) {
     let keybinds = {};
 
-    keybinds["w".charCodeAt(0)] = function() { cameraOffset.dy += 10; },
-    keybinds["a".charCodeAt(0)] = function() { cameraOffset.dx += 10; },
-    keybinds["s".charCodeAt(0)] = function() { cameraOffset.dy -= 10; },
-    keybinds["d".charCodeAt(0)] = function() { cameraOffset.dx -= 10; },
+    let minCameraPixels = 25;
+    keybinds["w".charCodeAt(0)] = function(co) { co.dy += minCameraPixels; };
+    keybinds["a".charCodeAt(0)] = function(co) { co.dx += minCameraPixels; };
+    keybinds["s".charCodeAt(0)] = function(co) { co.dy -= minCameraPixels; };
+    keybinds["d".charCodeAt(0)] = function(co) { co.dx -= minCameraPixels; };
     console.log(keybinds);
 
     $(window).on("keypress", function(evt) {
-        let f = keybinds[evt.keyCode];
-
-        if (f === undefined) {
+        let cameraFunc = keybinds[evt.keyCode];
+        if (cameraFunc === undefined) {
             return;
         }
 
         console.log(evt.keyCode, evt.code);
 
-        let prevCameraOffset = Object.assign({}, cameraOffset);
-        f();
-        if ((prevCameraOffset.dx !== cameraOffset.dx) ||
-            (prevCameraOffset.dy !== cameraOffset.dy)) {
-            redraw();
-        }
-
         // allow camera movements but check uiStateNoInput() if other
         // keys are added later
+        updateCamera(cameraFunc);
+    });
+
+    clickCanvas.addEventListener("wheel", function(evt) {
+        // 0 means units are in pixels
+        console.assert(evt.deltaMode === 0, "unexpected delta mode", evt);
+
+        // only care about y-axis scrolls (i.e. scroll up or down)
+        if (evt.deltaY === 0) {
+            return false;
+        }
+
+        updateCamera(function(co) {
+            // not ideal, but works ok for now. do more math later to figure
+            // out how to zoom in and out better
+            let scale = 0.1 * (evt.deltaY / (-50));
+            co.scaleX += scale;
+            co.scaleY += scale;
+        });
+
+        return false;
     });
 
 
