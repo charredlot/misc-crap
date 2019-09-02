@@ -318,11 +318,11 @@ function setKeys(clickCanvas, hexRadius) {
     let keybinds = {};
 
     let minCameraPixels = 25;
-    keybinds["w".charCodeAt(0)] = function(co) { co.dy += minCameraPixels; };
-    keybinds["a".charCodeAt(0)] = function(co) { co.dx += minCameraPixels; };
-    keybinds["s".charCodeAt(0)] = function(co) { co.dy -= minCameraPixels; };
-    keybinds["d".charCodeAt(0)] = function(co) { co.dx -= minCameraPixels; };
-    keybinds[" ".charCodeAt(0)] = function(co) {
+    keybinds["w"] = function(co) { co.dy += minCameraPixels; };
+    keybinds["a"] = function(co) { co.dx += minCameraPixels; };
+    keybinds["s"] = function(co) { co.dy -= minCameraPixels; };
+    keybinds["d"] = function(co) { co.dx -= minCameraPixels; };
+    keybinds[" "] = function(co) {
         co.dx = 0;
         co.dy = 0;
         co.scaleX = 1;
@@ -331,12 +331,16 @@ function setKeys(clickCanvas, hexRadius) {
     console.log(keybinds);
 
     $(window).on("keypress", function(evt) {
-        let cameraFunc = keybinds[evt.keyCode];
+        // if you use evt.code, on qwerty, w would map to w, but on e.g. dvorak
+        // it would trigger on where the w would be on a qwerty. so it's
+        // better to have weird defaults and let people rebind then assuming a
+        // particular keyboard layout
+        let cameraFunc = keybinds[evt.key];
         if (cameraFunc === undefined) {
             return;
         }
 
-        console.log(evt.keyCode, evt.code);
+        console.log(evt.key, evt.code);
 
         // allow camera movements but check uiStateNoInput() if other
         // keys are added later
