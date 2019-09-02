@@ -25,7 +25,11 @@ var ui = {
 };
 
 var center = {x: 0, y: 0};
-var cameraOffset = {dx: 0, dy: 0, scaleX: 1, scaleY: 1};
+var cameraOffset = {
+    originDX: 0, originDY: 0,
+    dx: 0, dy: 0,
+    scaleX: 1, scaleY: 1,
+};
 var sqrt3 = Math.sqrt(3);
 var halfSqrt3 = Math.sqrt(3) / 2;
 
@@ -65,9 +69,13 @@ var colorActionSelected;
 function redraw() {
     viewportCtx.clearRect(0, 0, viewport.width, viewport.height);
     canvasLayers.forEach(function(layer) {
+        // we want cameraOffset to be in canvas pixel coordinates since that's
+        // more intuitive. so if we want to move down and to the right on the
+        // image, we move its top left corner up and to the left relative to
+        // the viewport's top left corner. so we need to negate the values
         viewportCtx.drawImage(layer.canvas,
-                              cameraOffset.dx,
-                              cameraOffset.dy,
+                              -cameraOffset.dx,
+                              -cameraOffset.dy,
                               layer.canvas.width * cameraOffset.scaleX,
                               layer.canvas.height * cameraOffset.scaleY);
     });
@@ -113,11 +121,11 @@ function selectHex(hex, skipRedraw) {
 function clickToHex(evt) {
     let x = (evt.pageX
              - viewport.offsetLeft
-             - cameraOffset.dx
+             + cameraOffset.dx
              + viewportDX);
     let y = (evt.pageY
              - viewport.offsetTop
-             - cameraOffset.dy
+             + cameraOffset.dy
              + viewportDY);
 
     // https://www.redblobgames.com/grids/hexagons/#pixel-to-hex
@@ -318,13 +326,13 @@ function setKeys(clickCanvas, hexRadius) {
     let keybinds = {};
 
     let minCameraPixels = 25;
-    keybinds["w"] = function(co) { co.dy += minCameraPixels; };
-    keybinds["a"] = function(co) { co.dx += minCameraPixels; };
-    keybinds["s"] = function(co) { co.dy -= minCameraPixels; };
-    keybinds["d"] = function(co) { co.dx -= minCameraPixels; };
+    keybinds["w"] = function(co) { co.dy -= minCameraPixels; };
+    keybinds["a"] = function(co) { co.dx -= minCameraPixels; };
+    keybinds["s"] = function(co) { co.dy += minCameraPixels; };
+    keybinds["d"] = function(co) { co.dx += minCameraPixels; };
     keybinds[" "] = function(co) {
-        co.dx = 0;
-        co.dy = 0;
+        co.dx = co.originDX;
+        co.dy = co.originDY;
         co.scaleX = 1;
         co.scaleY = 1;
     };
@@ -609,6 +617,17 @@ function beginUnitTurn(effect, moveCoords) {
 
     ui.targetedCoords = moveCoords;
     ui.activeUnit = unit;
+
+
+    // move camera to center unit
+    // XXX: this is probably broken if scale is not 1?
+    let dx = hex.center.x - (viewport.width / 2)
+    let dy = hex.center.y - (viewport.height / 2);
+    cameraOffset.originDX = dx;
+    cameraOffset.originDY = dy;
+    cameraOffset.dx = dx;
+    cameraOffset.dy = dy;
+    redraw();
 }
 
 function ajaxHandleCombatStep(step) {
