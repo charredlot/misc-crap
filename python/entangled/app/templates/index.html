@@ -322,6 +322,12 @@ function setKeys(clickCanvas, hexRadius) {
     keybinds["a".charCodeAt(0)] = function(co) { co.dx += minCameraPixels; };
     keybinds["s".charCodeAt(0)] = function(co) { co.dy -= minCameraPixels; };
     keybinds["d".charCodeAt(0)] = function(co) { co.dx -= minCameraPixels; };
+    keybinds[" ".charCodeAt(0)] = function(co) {
+        co.dx = 0;
+        co.dy = 0;
+        co.scaleX = 1;
+        co.scaleY = 1;
+    };
     console.log(keybinds);
 
     $(window).on("keypress", function(evt) {
