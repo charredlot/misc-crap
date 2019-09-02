@@ -28,7 +28,7 @@ var center = {x: 0, y: 0};
 var cameraOffset = {
     originDX: 0, originDY: 0,
     dx: 0, dy: 0,
-    scaleX: 1, scaleY: 1,
+    scale: 1,
 };
 var sqrt3 = Math.sqrt(3);
 var halfSqrt3 = Math.sqrt(3) / 2;
@@ -74,10 +74,10 @@ function redraw() {
         // image, we move its top left corner up and to the left relative to
         // the viewport's top left corner. so we need to negate the values
         viewportCtx.drawImage(layer.canvas,
-                              -cameraOffset.dx,
-                              -cameraOffset.dy,
-                              layer.canvas.width * cameraOffset.scaleX,
-                              layer.canvas.height * cameraOffset.scaleY);
+                              (-cameraOffset.dx) * cameraOffset.scale,
+                              (-cameraOffset.dy) * cameraOffset.scale,
+                              layer.canvas.width * cameraOffset.scale,
+                              layer.canvas.height * cameraOffset.scale);
     });
 }
 
@@ -119,18 +119,22 @@ function selectHex(hex, skipRedraw) {
 }
 
 function clickToHex(evt) {
+    // viewport offsetLeft and offsetTop are the offset of the viewport
+    // relative to the page. so it's not affected by our canvas shenanigans
+    // however we do have to scale viewportDX and viewportDY because
     let x = (evt.pageX
              - viewport.offsetLeft
-             + cameraOffset.dx
-             + viewportDX);
+             + (cameraOffset.dx + viewportDX) * cameraOffset.scale);
     let y = (evt.pageY
              - viewport.offsetTop
-             + cameraOffset.dy
-             + viewportDY);
+             + (cameraOffset.dy + viewportDY) * cameraOffset.scale);
 
+    // have to scale the hex radius since that changes if we zoom
     // https://www.redblobgames.com/grids/hexagons/#pixel-to-hex
-    let q = Math.round(((x / sqrt3) - (y / 3)) / viewportHexRadius);
-    let r = Math.round((y * 2 / 3) / viewportHexRadius);
+    let q = Math.round(((x / sqrt3) - (y / 3))
+                        / (viewportHexRadius * cameraOffset.scale));
+    let r = Math.round((y * 2 / 3)
+                        / (viewportHexRadius * cameraOffset.scale));
 
     // thanks for not having integers javascript
     if (Object.is(q, -0)) {
@@ -315,8 +319,7 @@ function updateCamera(cameraModify) {
     cameraModify(cameraOffset);
     if ((prevCameraOffset.dx !== cameraOffset.dx) ||
         (prevCameraOffset.dy !== cameraOffset.dy) ||
-        (prevCameraOffset.scaleX !== cameraOffset.scaleX) ||
-        (prevCameraOffset.scaleY !== cameraOffset.scaleY)) {
+        (prevCameraOffset.scale !== cameraOffset.scale)) {
         redraw();
     }
 
@@ -333,8 +336,7 @@ function setKeys(clickCanvas, hexRadius) {
     keybinds[" "] = function(co) {
         co.dx = co.originDX;
         co.dy = co.originDY;
-        co.scaleX = 1;
-        co.scaleY = 1;
+        co.scale = 1;
     };
     console.log(keybinds);
 
@@ -368,8 +370,10 @@ function setKeys(clickCanvas, hexRadius) {
             // not ideal, but works ok for now. do more math later to figure
             // out how to zoom in and out better
             let scale = 0.1 * (evt.deltaY / (-50));
-            co.scaleX += scale;
-            co.scaleY += scale;
+            co.scale += scale;
+            if (co.scale < 0.1) {
+                co.scale = 0.1;
+            }
         });
 
         return false;
