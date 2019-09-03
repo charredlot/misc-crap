@@ -12,7 +12,7 @@ from engine.event import (
     ErrorEffect,
 )
 from grid import axial_json, AxialCoord, coords_circle, HexGrid
-from unit import CombatUnit, unit_json
+from unit import CombatUnit
 from unit.event import UnitTurnBeganEffect, UnitTurnCombatEvent
 from util import to_json
 
@@ -135,7 +135,9 @@ class Combat:
 def combat_json(combat):
     curr_timestamp, curr_event = combat.event_queue.peek()
     return {
-        "units": {key: unit_json(unit) for key, unit in combat.units.items()},
+        "units": {
+            key: unit.to_json(combat) for key, unit in combat.units.items()
+        },
         "tiles": [
             {
                 "q": coord.q,

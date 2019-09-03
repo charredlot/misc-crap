@@ -1,6 +1,7 @@
+from actions import RadiusAction
 from combat import Combat
 from grid import AxialCoord, HexGrid
-from unit import CombatUnit
+from unit import ActionList, CombatUnit
 
 
 def get_combat():
@@ -58,7 +59,19 @@ def get_combat():
     combat.debug.print_events = True
 
     combat.place_unit(
-        CombatUnit("P1", friendly=True, control=CombatUnit.PLAYER_CONTROL),
+        CombatUnit(
+            "P1",
+            friendly=True,
+            control=CombatUnit.PLAYER_CONTROL,
+            actions=ActionList(
+                top_level=[RadiusAction(key="Melee", radius=1)],
+                folders={
+                    "Elemental": [
+                        RadiusAction(key="Fireball", radius=3, aoe_radius=1)
+                    ]
+                },
+            ),
+        ),
         AxialCoord(2, 5),
     )
     combat.place_unit(
