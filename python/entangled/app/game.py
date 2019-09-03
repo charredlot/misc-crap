@@ -1,6 +1,6 @@
 from combat import Combat
 from level import AxialCoord, HexGrid
-from unit import Unit
+from unit import CombatUnit
 
 
 def get_combat():
@@ -58,11 +58,11 @@ def get_combat():
     combat.debug.print_events = True
 
     combat.place_unit(
-        Unit("P1", friendly=True, control=Unit.PLAYER_CONTROL),
+        CombatUnit("P1", friendly=True, control=CombatUnit.PLAYER_CONTROL),
         AxialCoord(2, 5),
     )
     combat.place_unit(
-        Unit("P2", friendly=True, control=Unit.PLAYER_CONTROL),
+        CombatUnit("P2", friendly=True, control=CombatUnit.PLAYER_CONTROL),
         AxialCoord(1, 6),
     )
 
@@ -74,6 +74,6 @@ def get_combat():
             AxialCoord(3, -4),
         )
     ):
-        combat.place_unit(Unit("Mook {}".format(i)), coord)
+        combat.place_unit(CombatUnit("Mook {}".format(i)), coord)
 
     return combat

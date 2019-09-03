@@ -12,7 +12,7 @@ from engine.event import (
     ErrorEffect,
 )
 from level import axial_json, AxialCoord, coords_circle, HexGrid
-from unit import Unit, unit_json
+from unit import CombatUnit, unit_json
 from unit.event import UnitTurnBeganEffect, UnitTurnCombatEvent
 from util import to_json
 
@@ -29,7 +29,7 @@ class Combat:
         self.event_queue = CombatEventQueue()
         self.curr_event: Optional[CombatEvent] = None
 
-        self.units: Dict[str, Unit] = {}
+        self.units: Dict[str, CombatUnit] = {}
 
         self.unit_key_to_coord: Dict[str, AxialCoord] = {}
         self.coord_to_unit_key: Dict[AxialCoord, str] = {}
@@ -66,7 +66,7 @@ class Combat:
 
         return command.apply(self)
 
-    def place_unit(self, unit: Unit, coord: AxialCoord):
+    def place_unit(self, unit: CombatUnit, coord: AxialCoord):
         unit_key = unit.key()
         self.units[unit_key] = unit
 
@@ -80,7 +80,7 @@ class Combat:
         self.move_unit(unit, coord)
         self.push_turn_event(unit, UnitTurnCombatEvent(unit))
 
-    def move_unit(self, unit: Unit, dst: AxialCoord):
+    def move_unit(self, unit: CombatUnit, dst: AxialCoord):
         """
         Doesn't do any checks besides destination having a unit.
         Other checks are up to caller, e.g. reachability
@@ -101,7 +101,7 @@ class Combat:
         self.unit_key_to_coord[unit_key] = dst
         self.coord_to_unit_key[dst] = unit_key
 
-    def push_turn_event(self, unit: Unit, turn: UnitTurnCombatEvent):
+    def push_turn_event(self, unit: CombatUnit, turn: UnitTurnCombatEvent):
         self.unit_key_to_next_turn[unit.key()] = turn
         self.push_event(turn)
 
@@ -112,7 +112,7 @@ class Combat:
         self.event_queue.push(event)
 
     def unit_move_coords(
-        self, unit: Unit, action_points: int
+        self, unit: CombatUnit, action_points: int
     ) -> Iterable[Tuple[AxialCoord, List[AxialCoord]]]:
         # tuple is coord and the shortest path from the unit to
         # the coord

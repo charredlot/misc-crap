@@ -1,7 +1,11 @@
 from util import to_json
 
 
-class Unit:
+class CombatUnit:
+    """
+    Represents the unit's state for the current combat
+    """
+
     PLAYER_CONTROL = 1
     CPU_CONTROL = 2
 
@@ -23,11 +27,11 @@ class Unit:
         return self.name
 
     def __repr__(self):
-        return "Unit({})".format(self.name)
+        return "CombatUnit({})".format(self.name)
 
 
-@to_json.register(Unit)
-def unit_json(unit: Unit):
+@to_json.register(CombatUnit)
+def unit_json(unit: CombatUnit):
     obj = {
         key: getattr(unit, key)
         for key in (
