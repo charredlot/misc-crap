@@ -5,7 +5,7 @@ from flask import Blueprint, current_app, render_template, request, Response
 
 from app.game import get_combat
 from combat import combat_json, EndActiveUnitTurnCommand, MoveActiveUnitCommand
-from level import AxialCoord
+from grid import AxialCoord
 
 
 bp = Blueprint("argh", __name__, template_folder="templates")

@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from level import AxialCoord, AxialEdge, coords_circle, HexGrid
+from grid import AxialCoord, AxialEdge, coords_circle, HexGrid
 
 
 class TestHexGrid(TestCase):

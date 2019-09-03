@@ -11,7 +11,7 @@ from engine.event import (
     CommandableCombatEvent,
     ErrorEffect,
 )
-from level import axial_json, AxialCoord, coords_circle, HexGrid
+from grid import axial_json, AxialCoord, coords_circle, HexGrid
 from unit import CombatUnit, unit_json
 from unit.event import UnitTurnBeganEffect, UnitTurnCombatEvent
 from util import to_json

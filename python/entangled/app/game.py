@@ -1,5 +1,5 @@
 from combat import Combat
-from level import AxialCoord, HexGrid
+from grid import AxialCoord, HexGrid
 from unit import CombatUnit
 
 
