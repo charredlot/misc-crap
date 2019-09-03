@@ -12,7 +12,7 @@ class CombatEventTest(CombatEvent):
 class TestCombatEventQueue(TestCase):
     def _test_order(self, q: CombatEventQueue, events_in_order):
         for expected in events_in_order:
-            popped = q.pop()
+            _, popped = q.pop()
             self.assertEqual(popped, expected)
 
     def test_push(self):
@@ -33,7 +33,7 @@ class TestCombatEventQueue(TestCase):
         q.push_all(sample(initial, len(initial)))
 
         q.push(first)
-        popped = q.pop()
+        _, popped = q.pop()
         self.assertEqual(first, popped)
 
         # popping time should make the starting point 2

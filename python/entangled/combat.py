@@ -40,13 +40,14 @@ class Combat:
         if self.curr_event and not self.curr_event.is_done():
             raise Exception("{} needs commands".format(self.curr_event))
 
-        event = self.event_queue.pop()
+        timestamp, event = self.event_queue.pop()
         if self.debug.print_events:
             logging.info("Pop and execute event: %s", event)
 
         effects = event.execute(self)
 
         self.curr_event = event
+        self.curr_event_timestamp = timestamp
         return effects
 
     def process_command(
@@ -132,6 +133,7 @@ class Combat:
 
 @to_json.register(Combat)
 def combat_json(combat):
+    curr_timestamp, curr_event = combat.event_queue.peek()
     return {
         "units": {key: unit_json(unit) for key, unit in combat.units.items()},
         "tiles": [
@@ -148,8 +150,14 @@ def combat_json(combat):
             unit_key: {"q": coord.q, "r": coord.r}
             for unit_key, coord in combat.unit_key_to_coord.items()
         },
-        "events": [e.to_json() for e in combat.event_queue],
-        "curr_event": combat.curr_event.to_json()
+        "events": [
+            {**e.to_json(), "timestamp": timestamp}
+            for timestamp, e in combat.event_queue
+        ],
+        "curr_event": {
+            **combat.curr_event.to_json(),
+            "timestamp": combat.curr_event_timestamp,
+        }
         if combat.curr_event
         else None,
     }
@@ -243,3 +251,17 @@ class MoveActiveUnitCommand(CombatCommand):
             UnitTurnBeganEffect(turn.unit, combat, turn.action_points)
         )
         return effects
+
+
+class EndActiveUnitTurnCommand(CombatCommand):
+    def apply(self, combat: Combat) -> Iterable[CombatEventEffect]:
+        turn = combat.curr_event
+        if not isinstance(turn, UnitTurnCombatEvent):
+            raise Exception("Event {} is not a unit turn".format(turn))
+
+        turn.done = True
+
+        # add unit's next turn
+        combat.push_turn_event(turn.unit, UnitTurnCombatEvent(turn.unit))
+
+        return combat.step()

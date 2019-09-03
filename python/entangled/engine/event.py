@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Iterable
+from typing import Iterable, Tuple
 
 import heapq
 
@@ -94,18 +94,22 @@ class CombatEventQueue:
         for event in events:
             self.push(event)
 
-    def pop(self) -> CombatEvent:
+    def pop(self) -> Tuple[int, CombatEvent]:
         # timestamp moves on every pop event
         timestamp, _, _, event = heapq.heappop(self.events)
         self.timestamp = timestamp
-        return event
+        return timestamp, event
+
+    def peek(self):
+        timestamp, _, _, event = self.events[0]
+        return (timestamp, event)
 
     def __iter__(self):
         # make copy of list
         events = list(self.events)
         while events:
-            t = heapq.heappop(events)
-            yield t[-1]
+            timestamp, _, _, event = heapq.heappop(events)
+            yield (timestamp, event)
 
 
 class ErrorEffect(CombatEventEffect):

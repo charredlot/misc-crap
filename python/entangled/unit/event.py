@@ -21,6 +21,7 @@ class UnitTurnCombatEvent(CommandableCombatEvent):
         self.action_points = (
             action_points if action_points is not None else unit.action_points
         )
+        self.done = False
 
     def execute(self, combat) -> Iterable[CombatEventEffect]:
         # UI needs to know that turn started
@@ -35,7 +36,7 @@ class UnitTurnCombatEvent(CommandableCombatEvent):
         return obj
 
     def is_done(self):
-        return False
+        return self.done
 
     def __repr__(self):
         return "{} for {}".format(super().__repr__(), self.unit)

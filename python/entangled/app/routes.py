@@ -4,7 +4,7 @@ import time
 from flask import Blueprint, current_app, render_template, request, Response
 
 from app.game import get_combat
-from combat import combat_json, MoveActiveUnitCommand
+from combat import combat_json, EndActiveUnitTurnCommand, MoveActiveUnitCommand
 from level import AxialCoord
 
 
@@ -43,4 +43,11 @@ def move_active_unit():
     combat = current_app.combat
     effects = combat.process_command(MoveActiveUnitCommand(path))
 
+    return _combat_step_json(combat, effects)
+
+
+@bp.route("/end_active_unit_turn", methods=["POST"])
+def end_active_unit_turn():
+    combat = current_app.combat
+    effects = combat.process_command(EndActiveUnitTurnCommand())
     return _combat_step_json(combat, effects)
