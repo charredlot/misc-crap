@@ -1,3 +1,4 @@
+
 <html>
 
     <head>
@@ -579,10 +580,41 @@ function updateActiveUnitActionPoints() {
     domActiveUnitAP.text(ap);
 }
 
-function addAction(title, onclick) {
+function addActionCommand(action) {
+    addCommand(action.key, function(actionElem, evt) {
+        console.log("clicked", action);
+    });
+}
+
+function addActionCommands(actions) {
+    if (actions.top_level) {
+        actions.top_level.forEach(function(action) {
+            addActionCommand(action);
+        });
+    }
+
+    let folders = actions.folders;
+    if (!folders) {
+        return;
+    }
+
+    Object.getOwnPropertyNames(folders).forEach(function(folder) {
+        let folder_actions = folders[folder];
+        folder_actions.forEach(function(action) {
+            console.log("boop tbd", action);
+        });
+    });
+}
+
+
+function addCommand(title, onclick) {
     let newAction = domActionTemplate.clone();
     newAction.text(title);
     newAction.click(function (evt) {
+        if (uiStateNoInput()) {
+            return;
+        }
+
         return onclick(newAction, evt);
     });
     domActiveUnitActions.append(newAction);
@@ -603,11 +635,7 @@ function beginUnitTurn(effect, moveCoords) {
     updateActiveUnitActionPoints();
 
     domActiveUnitActions.empty();
-    addAction("Move", function(actionElem, evt) {
-        if (uiStateNoInput()) {
-            return;
-        }
-
+    addCommand("Move", function(actionElem, evt) {
         if (uiState() === UI_STATE_MOVING) {
             actionElem.css("background", COLOR_ACTION_BUTTON);
             clearLayer(LAYER_GRID_TARGET);
@@ -621,11 +649,9 @@ function beginUnitTurn(effect, moveCoords) {
         redraw();
     });
 
-    addAction("End Turn", function(actionElem, evt) {
-        if (uiStateNoInput()) {
-            return;
-        }
+    addActionCommands(unit.actions)
 
+    addCommand("End Turn", function(actionElem, evt) {
         actionElem.css("background", COLOR_ACTION_BUTTON_ACTIVE);
         uiAjaxStart();
         $.ajax({
