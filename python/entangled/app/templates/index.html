@@ -583,7 +583,7 @@ function updateActiveUnitActionPoints() {
 function beginUnitTurn(effect, moveCoords) {
     let coord = combat.unit_key_to_coord[effect.unit_key];
     let hex = combat.grid[coord.q][coord.r];
-    let unit = hex.unit;
+    let unit = combat.units[effect.unit_key];
 
     selectHex(hex);
 
@@ -645,6 +645,8 @@ function ajaxHandleCombatStep(step) {
     combat.effects = step.effects;
     combat.curr_event = step.curr_event;
     combat.events = step.event;
+    combat.unit_key_to_coord = step.unit_key_to_coord;
+    combat.units = step.units;
 
     ui.pendingEffects = step.effects;
 }
