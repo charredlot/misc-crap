@@ -23,6 +23,7 @@ var ui = {
     pendingEffects: null,
     // the ID from the requestAnimationFrame call
     animationID: null,
+    mousedown: null,
 };
 
 var center = {x: 0, y: 0};
@@ -119,16 +120,22 @@ function selectHex(hex, skipRedraw) {
     }
 }
 
+function clickToViewport(evt) {
+    return {
+        x: evt.pageX - viewport.offsetLeft,
+        y: evt.pageY - viewport.offsetTop,
+    };
+}
+
 function clickToHex(evt) {
     // viewport offsetLeft and offsetTop are the offset of the viewport
     // relative to the page. so it's not affected by our canvas shenanigans
     // however we do have to scale viewportDX and viewportDY because
-    let x = (evt.pageX
-             - viewport.offsetLeft
-             + (cameraOffset.dx + viewportDX) * cameraOffset.scale);
-    let y = (evt.pageY
-             - viewport.offsetTop
-             + (cameraOffset.dy + viewportDY) * cameraOffset.scale);
+    let point = clickToViewport(evt);
+    let x = (point.x +
+             (cameraOffset.dx + viewportDX) * cameraOffset.scale);
+    let y = (point.y +
+             (cameraOffset.dy + viewportDY) * cameraOffset.scale);
 
     // have to scale the hex radius since that changes if we zoom
     // https://www.redblobgames.com/grids/hexagons/#pixel-to-hex
@@ -380,6 +387,27 @@ function setKeys(clickCanvas, hexRadius) {
         return false;
     });
 
+    clickCanvas.addEventListener('mousedown', function(evt) {
+        let point = clickToViewport(evt);
+        ui.mousedown = point;
+    });
+
+    // XXX: sometimes mouseup events get dropped???
+    clickCanvas.addEventListener('mouseup', function(evt) {
+        if (!ui.mousedown) {
+            console.log("eh mouseup with no mousedown?");
+            return;
+        }
+
+        let point = clickToViewport(evt);
+        let diffX = ui.mousedown.x - point.x;
+        let diffY = ui.mousedown.y - point.y;
+        updateCamera(function(co) {
+            co.dx += diffX;
+            co.dy += diffY;
+        });
+        ui.mousedown = null;
+    });
 
     clickCanvas.addEventListener('click', function(evt) {
         let hex = clickToHex(evt);
