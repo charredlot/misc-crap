@@ -188,4 +188,14 @@ mod tests {
             center.circle_coords(2).iter().copied().collect();
         assert_eq!(circle, expected);
     }
+
+    #[test]
+    fn test_hex_distance() {
+        let coord = AxialCoord{q: -1, r: 1};
+        assert_eq!(coord.hex_distance(&coord), 0);
+        assert_eq!(coord.hex_distance(&AxialCoord{q: 3, r: -1}), 4);
+        assert_eq!(coord.hex_distance(&AxialCoord{q: 0, r: 0}), 1);
+        assert_eq!(coord.hex_distance(&AxialCoord{q: -3, r: 1}), 2);
+        assert_eq!(coord.hex_distance(&AxialCoord{q: -2, r: 4}), 3);
+    }
 }
