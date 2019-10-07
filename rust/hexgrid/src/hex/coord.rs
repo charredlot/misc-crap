@@ -55,16 +55,20 @@ impl AxialCoord {
     }
 
     pub fn circle_coords(&self, radius: usize) -> Vec<AxialCoord> {
-        /* see https://www.redblobgames.com/grids/hexagons/ */
+        /*
+         * a circle centered at self
+         * see https://www.redblobgames.com/grids/hexagons/
+         */
         let mut coords = Vec::new();
         let r = radius as i32;
+        let center = CubeCoord::from(*self);
         for x in -r..(r+1) {
             let min_y: i32 = max(-r, -x - r);
             let max_y: i32 = min(r, -x + r)  + 1;
             for y in min_y..max_y {
-                /* x + y + z = 0 for cube coords*/
+                /* x + y + z = 0 for cube coords */
                 coords.push(AxialCoord::from(
-                    CubeCoord{x: x, y: y, z: 0 - x - y}
+                    CubeCoord{x: center.x + x, y: y, z: center.z + 0 - x - y}
                 ));
             }
         }
@@ -115,7 +119,7 @@ mod tests {
         let coord = AxialCoord{q: 1, r: 0};
         let neighbors: HashSet<AxialCoord> =
             coord.neighbors().iter().copied().collect();
-        assert!(neighbors == expected);
+        assert_eq!(neighbors, expected);
     }
 
     #[test]
@@ -153,5 +157,35 @@ mod tests {
                    AxialDir{dq: -2, dr: 5});
         assert_eq!(AxialCoord{q: -2, r: 3}.dir(AxialCoord{q: -8, r: -1}),
                    AxialDir{dq: -3, dr: -2});
+    }
+
+    #[test]
+    fn test_circle() {
+        let center = AxialCoord{q: 1, r: 0};
+        let expected: HashSet<AxialCoord> =
+            [
+                center,
+                AxialCoord{q: -1, r: 0},
+                AxialCoord{q: -1, r: 1},
+                AxialCoord{q: -1, r: 2},
+                AxialCoord{q: 0, r: -1},
+                AxialCoord{q: 0, r: 0},
+                AxialCoord{q: 0, r: 1},
+                AxialCoord{q: 0, r: 2},
+                AxialCoord{q: 1, r: -2},
+                AxialCoord{q: 1, r: -1},
+                AxialCoord{q: 1, r: 1},
+                AxialCoord{q: 1, r: 2},
+                AxialCoord{q: 2, r: -2},
+                AxialCoord{q: 2, r: -1},
+                AxialCoord{q: 2, r: 0},
+                AxialCoord{q: 2, r: 1},
+                AxialCoord{q: 3, r: -2},
+                AxialCoord{q: 3, r: -1},
+                AxialCoord{q: 3, r: 0},
+            ].iter().copied().collect();
+        let circle: HashSet<AxialCoord> =
+            center.circle_coords(2).iter().copied().collect();
+        assert_eq!(circle, expected);
     }
 }
