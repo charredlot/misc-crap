@@ -76,8 +76,8 @@ impl HexGrid {
     }
 
     pub fn get_path(&self,
-                    src: AxialCoord,
-                    dst: AxialCoord) -> Option<Vec<AxialCoord>> {
+                    src: &AxialCoord,
+                    dst: &AxialCoord) -> Option<Vec<AxialCoord>> {
         /* a star as implemented in wiki */
 
         /* predecessor map to rebuild the path */
@@ -90,17 +90,17 @@ impl HexGrid {
         let mut open_set: BTreeSet<CostCoord> = BTreeSet::new();
         let mut visited: HashSet<AxialCoord> = HashSet::new();
 
-        g_scorex10.insert(src, 0);
-        open_set.insert(CostCoord{coord: src, costx10: 0});
+        g_scorex10.insert(*src, 0);
+        open_set.insert(CostCoord{coord: *src, costx10: 0});
         while !open_set.is_empty() {
             /* pop the min val (but there's no pop or drain method Q_Q) */
             let curr = open_set.iter().next().unwrap().clone();
             open_set.remove(&curr);
 
             /* found the path */
-            if curr.coord == dst {
+            if curr.coord == *dst {
                 let mut path = Vec::new();
-                let mut curr = dst;
+                let mut curr = *dst;
                 loop {
                     path.push(curr);
                     if let Some(&prev) = best_prev.get(&curr) {
@@ -120,6 +120,11 @@ impl HexGrid {
             if neighbors.is_none() {
                 continue;
             }
+
+            let prefer_dir = match best_prev.get(&curr.coord) {
+                Some(prev_coord) => Some(prev_coord.dir(&curr.coord)),
+                None => None,
+            };
 
             /* XXX: get best_dir and add a bonus for direction */
             let neighbors = neighbors.unwrap();
@@ -150,9 +155,24 @@ impl HexGrid {
                 /*
                  * this is the heuristic, it should never overestimate the cost
                  * to be admissible
+                 *
+                 * add 0.5 cost if it causes a dir change. this is so that the
+                 * paths prefer maintaining a straight line to look more
+                 * natural
                  */
-                let h_scorex10 = neighbor_coord.hex_distance(&dst) * 10;
-
+                let neigh_dir = neighbor_coord.dir(&curr.coord);
+                let h_scorex10 = neighbor_coord.hex_distance(&dst) * 10 +
+                    match prefer_dir {
+                        Some(dir) => {
+                            if neigh_dir != dir {
+                                5
+                            }
+                            else {
+                                0
+                            }
+                        },
+                        None => 0,
+                    };
                 /* this is f(x) = g(x) + h(x) */
                 open_set.insert(CostCoord{coord: neighbor_coord,
                                           costx10: h_scorex10});
@@ -228,12 +248,46 @@ mod tests {
             }
         }
 
-        /* test case needs to be deterministic */
-        let expected = vec![AxialCoord{q: 0, r: 0},
-                            AxialCoord{q: -1, r: 1},
-                            AxialCoord{q: -2, r: 2},
-                            AxialCoord{q: -3, r: 3}];
-        assert_eq!(grid.get_path(center, AxialCoord{q: -3, r: 3}).unwrap(),
-                   expected);
+        assert_eq!(grid.get_path(&center, &AxialCoord{q: 5, r: 5}), None);
+
+        /*
+         * there can be multiple valid paths and the algo will randomly pick
+         * one depending on map order. so we need multiple test possibilities
+         */
+        let tests = [
+            ((center, AxialCoord{q: -3, r: 3}),
+              vec![
+                vec![AxialCoord{q: 0, r: 0},
+                     AxialCoord{q: -1, r: 1},
+                     AxialCoord{q: -2, r: 2},
+                     AxialCoord{q: -3, r: 3}],
+              ]),
+            ((center, AxialCoord{q: 2, r: 1}),
+              vec![
+                vec![AxialCoord{q: 0, r: 0},
+                     AxialCoord{q: 0, r: 1},
+                     AxialCoord{q: 1, r: 1},
+                     AxialCoord{q: 2, r: 1}],
+                vec![AxialCoord{q: 0, r: 0},
+                     AxialCoord{q: 1, r: 0},
+                     AxialCoord{q: 2, r: 0},
+                     AxialCoord{q: 2, r: 1}],
+              ]),
+        ];
+        for ((src, dst), possibilities) in &tests {
+            let path = grid.get_path(src, dst).unwrap();
+            let mut matched = false;
+
+            for possible_path in possibilities {
+                if path == *possible_path {
+                    matched = true;
+                    break;
+                }
+            }
+
+            assert!(matched,
+                    "Path {:?} did not match any of {:?}",
+                    path, possibilities);
+        }
     }
 }

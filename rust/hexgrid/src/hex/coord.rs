@@ -75,7 +75,7 @@ impl AxialCoord {
         coords
     }
 
-    pub fn dir(&self, dst: AxialCoord) -> AxialDir {
+    pub fn dir(&self, dst: &AxialCoord) -> AxialDir {
         let mut dq = dst.q - self.q;
         let mut dr = dst.r - self.r;
         let divisor = gcd32(dq, dr);
@@ -151,11 +151,11 @@ mod tests {
 
     #[test]
     fn test_dir() {
-        assert_eq!(AxialCoord{q: 2, r: 3}.dir(AxialCoord{q: 4, r: 5}),
+        assert_eq!(AxialCoord{q: 2, r: 3}.dir(&AxialCoord{q: 4, r: 5}),
                    AxialDir{dq: 1, dr: 1});
-        assert_eq!(AxialCoord{q: 5, r: 1}.dir(AxialCoord{q: 3, r: 6}),
+        assert_eq!(AxialCoord{q: 5, r: 1}.dir(&AxialCoord{q: 3, r: 6}),
                    AxialDir{dq: -2, dr: 5});
-        assert_eq!(AxialCoord{q: -2, r: 3}.dir(AxialCoord{q: -8, r: -1}),
+        assert_eq!(AxialCoord{q: -2, r: 3}.dir(&AxialCoord{q: -8, r: -1}),
                    AxialDir{dq: -3, dr: -2});
     }
 
