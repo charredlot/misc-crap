@@ -1,6 +1,7 @@
 use wasm_bindgen::prelude::*;
 
-use std::collections::{HashMap, HashSet};
+use std::cmp::{Ord, Ordering, PartialOrd};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::iter::FromIterator;
 
 use super::coord::AxialCoord;
@@ -10,6 +11,18 @@ pub struct HexGrid {
     adjacent: HashMap<AxialCoord, HashMap<AxialCoord, EdgeCosts>>,
     tiles: HashSet<AxialCoord>,
 }
+
+/*
+ * only used internally for pathfinding stuff
+ * float would be nicer, but they're a PITA for this use case since
+ * they don't implement cmp
+ */
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
+struct CostCoord {
+    coord: AxialCoord,
+    costx10: u32, /* use fixed point so we can tweak the scores */
+}
+
 
 /* might want to make this like a map in the future */
 #[wasm_bindgen]
@@ -61,6 +74,93 @@ impl HexGrid {
         let costs = dsts.get(&dst)?;
         Some(&costs)
     }
+
+    pub fn get_path(&self,
+                    src: AxialCoord,
+                    dst: AxialCoord) -> Option<Vec<AxialCoord>> {
+        /* a star as implemented in wiki */
+
+        /* predecessor map to rebuild the path */
+        let mut best_prev: HashMap<AxialCoord, AxialCoord> = HashMap::new();
+
+        /* g(x) is best edge cost to get to the given coord x from src */
+        let mut g_scorex10: HashMap<AxialCoord, u32> = HashMap::new();
+
+        /* the value is f(x) = g(x) + h(x), where h is the heuristic */
+        let mut open_set: BTreeSet<CostCoord> = BTreeSet::new();
+        let mut visited: HashSet<AxialCoord> = HashSet::new();
+
+        g_scorex10.insert(src, 0);
+        open_set.insert(CostCoord{coord: src, costx10: 0});
+        while !open_set.is_empty() {
+            /* pop the min val (but there's no pop or drain method Q_Q) */
+            let curr = open_set.iter().next().unwrap().clone();
+            open_set.remove(&curr);
+
+            /* found the path */
+            if curr.coord == dst {
+                let mut path = Vec::new();
+                let mut curr = dst;
+                loop {
+                    path.push(curr);
+                    if let Some(&prev) = best_prev.get(&curr) {
+                        curr = prev;
+                    }
+                    else {
+                        break;
+                    }
+                }
+                path.reverse();
+                return Some(path);
+            }
+
+            visited.insert(curr.coord);
+
+            let neighbors = self.adjacent.get(&curr.coord);
+            if neighbors.is_none() {
+                continue;
+            }
+
+            /* XXX: get best_dir and add a bonus for direction */
+            let neighbors = neighbors.unwrap();
+            for (&neighbor_coord, &costs) in neighbors {
+                if visited.get(&neighbor_coord).is_some() {
+                    continue;
+                }
+
+                /*
+                 * curr.coord is either the start coord, or it was put into
+                 * open_set after going through this loop. so it's always
+                 * in g_scorex10
+                 */
+                let tentative_scorex10 = g_scorex10.get(&curr.coord).unwrap() +
+                                        (costs.cost * 10);
+                let update = match g_scorex10.get(&neighbor_coord) {
+                    Some(&scorex10) => (tentative_scorex10 < scorex10),
+                    None => true,
+                };
+
+                if !update {
+                    continue;
+                }
+
+                best_prev.insert(neighbor_coord, curr.coord);
+                g_scorex10.insert(neighbor_coord, tentative_scorex10);
+
+                /*
+                 * this is the heuristic, it should never overestimate the cost
+                 * to be admissible
+                 */
+                let h_scorex10 = neighbor_coord.hex_distance(&dst) * 10;
+
+                /* this is f(x) = g(x) + h(x) */
+                open_set.insert(CostCoord{coord: neighbor_coord,
+                                          costx10: h_scorex10});
+            }
+        }
+
+        return None
+    }
 }
 
 impl From<&[AxialCoord]> for HexGrid {
@@ -69,6 +169,18 @@ impl From<&[AxialCoord]> for HexGrid {
             adjacent: HashMap::new(),
             tiles: HashSet::from_iter(coords.iter().copied()),
         }
+    }
+}
+
+impl Ord for CostCoord {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.costx10.cmp(&other.costx10)
+    }
+}
+
+impl PartialOrd for CostCoord {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -102,5 +214,26 @@ mod tests {
         assert_eq!(grid.get_edge_costs(AxialCoord{q: -1, r: 0},
                                        AxialCoord{q: 0, r: 0}),
                    None);
+    }
+
+    #[test]
+    pub fn test_get_path() {
+        let center = AxialCoord{q: 0, r: 0};
+        let tiles = center.circle_coords(3);
+        let mut grid = HexGrid::from(&tiles as &[AxialCoord]);
+        for &tile in &tiles {
+            for &neighbor in &tile.neighbors() {
+                grid.insert_edge(tile, neighbor, EdgeCosts{cost: 1});
+                grid.insert_edge(neighbor, tile, EdgeCosts{cost: 1});
+            }
+        }
+
+        /* test case needs to be deterministic */
+        let expected = vec![AxialCoord{q: 0, r: 0},
+                            AxialCoord{q: -1, r: 1},
+                            AxialCoord{q: -2, r: 2},
+                            AxialCoord{q: -3, r: 3}];
+        assert_eq!(grid.get_path(center, AxialCoord{q: -3, r: 3}).unwrap(),
+                   expected);
     }
 }
