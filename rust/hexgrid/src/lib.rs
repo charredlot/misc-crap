@@ -13,5 +13,5 @@ extern {
 #[wasm_bindgen]
 pub fn greet() {
     let coord: coord::AxialCoord = Default::default();
-    alert(&format!("Hello, {:?}!", coord));
+    alert(&format!("boop {:?}!", coord));
 }

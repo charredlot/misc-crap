@@ -1,2 +1,5 @@
+wasm:
+	wasm-pack build
+
 test:
-	cargo test -- --nocapture
+	RUST_BACKTRACE=1 cargo test -- --nocapture
