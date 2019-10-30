@@ -138,6 +138,7 @@ mod tests {
         assert_eq!(origin.hex_distance(&AxialCoord{q: 1, r: 0}), 1);
         assert_eq!(origin.hex_distance(&AxialCoord{q: 0, r: 0}), 1);
         assert_eq!(origin.hex_distance(&AxialCoord{q: 2, r: 0}), 2);
+        assert_eq!(origin.hex_distance(&AxialCoord{q: 2, r: 1}), 3);
         assert_eq!(origin.hex_distance(&AxialCoord{q: 1, r: 1}), 2);
     }
 
