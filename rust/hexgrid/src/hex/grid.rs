@@ -50,21 +50,48 @@ impl HexGrid {
         self.tiles.insert(coord);
     }
 
-    pub fn insert_edge(&mut self,
-                       src: AxialCoord,
-                       dst: AxialCoord,
-                       costs: EdgeCosts) -> bool {
-        if !self.tiles.contains(&src) || !self.tiles.contains(&dst) {
+    fn insert_edge_adjacency(
+        adjacent: &mut HashMap<AxialCoord, HashMap<AxialCoord, EdgeCosts>>,
+        tiles: &HashSet<AxialCoord>,
+        src: AxialCoord,
+        dst: AxialCoord,
+        costs: EdgeCosts,
+    ) -> bool {
+        if !tiles.contains(&src) || !tiles.contains(&dst) {
             return false;
         }
 
-        let dsts = self.adjacent.entry(src).or_insert_with(HashMap::new);
+        let dsts = adjacent.entry(src).or_insert_with(HashMap::new);
         dsts.entry(dst)
             .and_modify(|curr_costs| {
                 curr_costs.merge(costs);
             })
             .or_insert(costs);
         return true;
+    }
+
+    pub fn insert_edge(&mut self,
+                       src: AxialCoord,
+                       dst: AxialCoord,
+                       costs: EdgeCosts) -> bool {
+        return HexGrid::insert_edge_adjacency(&mut self.adjacent,
+                                              &self.tiles,
+                                              src, dst, costs);
+    }
+
+    pub fn insert_edge_for_all_neighbors(&mut self, default_costs: EdgeCosts) {
+        let tiles = &self.tiles;
+        let adjacent = &mut self.adjacent;
+        for &coord in tiles {
+            for &neighbor in &coord.neighbors() {
+                HexGrid::insert_edge_adjacency(
+                    adjacent, tiles, coord, neighbor, default_costs.clone(),
+                );
+                HexGrid::insert_edge_adjacency(
+                    adjacent, tiles, neighbor, coord, default_costs.clone(),
+                );
+            }
+        }
     }
 
     pub fn get_edge_costs(&self,
@@ -241,12 +268,7 @@ mod tests {
         let center = AxialCoord{q: 0, r: 0};
         let tiles = center.circle_coords(3);
         let mut grid = HexGrid::from(&tiles as &[AxialCoord]);
-        for &tile in &tiles {
-            for &neighbor in &tile.neighbors() {
-                grid.insert_edge(tile, neighbor, EdgeCosts{cost: 1});
-                grid.insert_edge(neighbor, tile, EdgeCosts{cost: 1});
-            }
-        }
+        grid.insert_edge_for_all_neighbors(EdgeCosts{cost: 1});
 
         assert_eq!(grid.get_path(&center, &AxialCoord{q: 5, r: 5}), None);
 
