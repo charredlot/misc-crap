@@ -102,6 +102,15 @@ impl HexGrid {
         Some(&costs)
     }
 
+    pub fn pretty_print_edges(&self) {
+        for (coord, adjacent) in self.adjacent.iter() {
+            println!("{:?}:", coord);
+            for (neighbor, costs) in adjacent.iter() {
+                println!("-> {:?} costs {:?}", neighbor, costs);
+            }
+        }
+    }
+
     pub fn get_path(&self,
                     src: &AxialCoord,
                     dst: &AxialCoord) -> Option<Vec<AxialCoord>> {
