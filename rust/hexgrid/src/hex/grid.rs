@@ -2,6 +2,7 @@ use wasm_bindgen::prelude::*;
 
 use std::cmp::{Ord, Ordering, PartialOrd};
 use std::collections::{BTreeSet, HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 
 use super::coord::AxialCoord;
@@ -17,7 +18,7 @@ pub struct HexGrid {
  * float would be nicer, but they're a PITA for this use case since
  * they don't implement cmp
  */
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Default, Eq)]
 struct CostCoord {
     coord: AxialCoord,
     costx10: u32, /* use fixed point so we can tweak the scores */
@@ -174,10 +175,11 @@ impl HexGrid {
                  * open_set after going through this loop. so it's always
                  * in g_scorex10
                  */
-                let tentative_scorex10 = g_scorex10.get(&curr.coord).unwrap() +
-                                        (costs.cost * 10);
+                let tentative_gscorex10 =
+                    g_scorex10.get(&curr.coord).unwrap() +
+                    (costs.cost * 10);
                 let update = match g_scorex10.get(&neighbor_coord) {
-                    Some(&scorex10) => (tentative_scorex10 < scorex10),
+                    Some(&scorex10) => (tentative_gscorex10 < scorex10),
                     None => true,
                 };
 
@@ -186,22 +188,22 @@ impl HexGrid {
                 }
 
                 best_prev.insert(neighbor_coord, curr.coord);
-                g_scorex10.insert(neighbor_coord, tentative_scorex10);
+                g_scorex10.insert(neighbor_coord, tentative_gscorex10);
 
                 /*
                  * this is the heuristic, it should never overestimate the cost
                  * to be admissible
                  *
-                 * add 0.5 cost if it causes a dir change. this is so that the
+                 * add tiny cost if it causes a dir change. this is so that the
                  * paths prefer maintaining a straight line to look more
                  * natural
                  */
-                let neigh_dir = neighbor_coord.dir(&curr.coord);
-                let h_scorex10 = neighbor_coord.hex_distance(&dst) * 10 +
+                let neigh_dir = curr.coord.dir(&neighbor_coord);
+                let h_score = neighbor_coord.hex_distance(&dst) * 5 +
                     match prefer_dir {
                         Some(dir) => {
                             if neigh_dir != dir {
-                                5
+                                2
                             }
                             else {
                                 0
@@ -209,9 +211,12 @@ impl HexGrid {
                         },
                         None => 0,
                     };
+
                 /* this is f(x) = g(x) + h(x) */
-                open_set.insert(CostCoord{coord: neighbor_coord,
-                                          costx10: h_scorex10});
+                open_set.insert(CostCoord{
+                    coord: neighbor_coord,
+                    costx10: tentative_gscorex10 + h_score,
+                });
             }
         }
 
@@ -230,13 +235,48 @@ impl From<&[AxialCoord]> for HexGrid {
 
 impl Ord for CostCoord {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.costx10.cmp(&other.costx10)
+        if self.coord == other.coord {
+            return Ordering::Equal;
+        }
+
+        if self.costx10 == other.costx10 {
+            /* always break ties so different coords aren't equal */
+            if self.coord.q < other.coord.q {
+                return Ordering::Less;
+            }
+            else if self.coord.q > other.coord.q {
+                return Ordering::Greater;
+            }
+            else {
+                if self.coord.r < other.coord.r {
+                    return Ordering::Less;
+                }
+                else if self.coord.r > other.coord.r {
+                    return Ordering::Greater;
+                }
+            }
+            assert!(false, "should be unreachable");
+        }
+
+        return self.costx10.cmp(&other.costx10);
     }
 }
 
 impl PartialOrd for CostCoord {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for CostCoord {
+    fn eq(&self, other: &CostCoord) -> bool {
+        self.coord == other.coord
+    }
+}
+
+impl Hash for CostCoord {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.coord.hash(state);
     }
 }
 
@@ -305,20 +345,34 @@ mod tests {
                      AxialCoord{q: 2, r: 1}],
               ]),
         ];
-        for ((src, dst), possibilities) in &tests {
-            let path = grid.get_path(src, dst).unwrap();
-            let mut matched = false;
+        /*
+         * run the tests multiple times because randomness in the hash map
+         * order can give diff results
+         */
+        for _ in 0..3 {
+            for ((src, dst), possibilities) in &tests {
+                let path = match grid.get_path(src, dst) {
+                    Some(p) => p,
+                    None => {
+                        assert!(false, "no path for src {:?} dst {:?}",
+                                src, dst);
+                        break;
+                    },
+                };
 
-            for possible_path in possibilities {
-                if path == *possible_path {
-                    matched = true;
-                    break;
+                let mut matched = false;
+
+                for possible_path in possibilities {
+                    if path == *possible_path {
+                        matched = true;
+                        break;
+                    }
                 }
-            }
 
-            assert!(matched,
-                    "Path {:?} did not match any of {:?}",
-                    path, possibilities);
+                assert!(matched,
+                        "Path {:?} did not match any of {:?}",
+                        path, possibilities);
+            }
         }
     }
 }
