@@ -224,6 +224,19 @@ impl HexGrid {
     }
 }
 
+/* wasm-bindgen can't pass complex types, so we have to use json */
+#[wasm_bindgen]
+impl HexGrid {
+    pub fn get_coords_json(&self) -> String {
+        let coords = Vec::from_iter(
+            self.tiles.iter().map(
+                |coord| format!("{{\"q\": {}, \"r\": {}}}", coord.q, coord.r)
+                )
+            );
+        format!("[{}]", coords.join(","))
+    }
+}
+
 impl From<&[AxialCoord]> for HexGrid {
     fn from(coords: &[AxialCoord]) -> HexGrid {
         HexGrid{

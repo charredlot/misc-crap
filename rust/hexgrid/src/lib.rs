@@ -3,15 +3,15 @@ use wasm_bindgen::prelude::*;
 mod hex;
 mod misc;
 
-use hex::coord;
+use hex::coord::AxialCoord;
+use hex::grid::{EdgeCosts, HexGrid};
 
 #[wasm_bindgen]
-extern {
-    fn alert(s: &str);
-}
+pub fn initial_grid() -> HexGrid {
+    let center = AxialCoord{q: 0, r: 0};
+    let tiles = center.circle_coords(3);
+    let mut grid = HexGrid::from(&tiles as &[AxialCoord]);
+    grid.insert_edge_for_all_neighbors(EdgeCosts{cost: 1});
 
-#[wasm_bindgen]
-pub fn greet() {
-    let coord: coord::AxialCoord = Default::default();
-    alert(&format!("boop {:?}!", coord));
+    return grid;
 }
