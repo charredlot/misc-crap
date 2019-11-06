@@ -4,12 +4,22 @@ import * as THREE from "three";
 const SQRT3 = Math.sqrt(3);
 const HALF_SQRT3 = SQRT3 / 2;
 
+var debug = true;
+
 var camera;
 var canvas;
 var grid;
 var renderer;
-var rootObject;
-var scene;
+var rootObject = new THREE.Object3D();
+var scene = new THREE.Scene();
+
+/* https://threejsfundamentals.org/threejs/lessons/threejs-picking.html */
+var picker = {
+    target: new THREE.WebGLRenderTarget(1, 1),
+    pixelBuffer: new Uint8Array(4),
+    rootObject: new THREE.Object3D(),
+    scene: new THREE.Scene(),
+};
 
 function onWindowResize() {
     const width = canvas.clientWidth;
@@ -47,8 +57,8 @@ function hexShape(size) {
     return new THREE.ExtrudeBufferGeometry(path, extrudeSettings);
 }
 
-/* convert to three.js coords */
-function axialToPoint(coord, radius) {
+/* convert to three.js coords assuming q=0, r=0 is at (0, 0, 0) */
+function axialToPosition(coord, radius) {
     const {q, r} = coord;
     return {
         x: radius * ((SQRT3 * q) + (HALF_SQRT3 * r)),
@@ -56,44 +66,107 @@ function axialToPoint(coord, radius) {
     }
 }
 
-function onKeyDown(evt) {
-    console.log("keydown", evt.key);
-    switch (evt.key) {
-    case "w":
-        rootObject.rotation.x += 0.2;
-        break;
-    case "a":
-        rootObject.rotation.z += 0.2;
-        break;
-    case "s":
-        rootObject.rotation.x -= 0.2;
-        break;
-    case "d":
-        rootObject.rotation.z -= 0.2;
-        break;
+function axialToPickerID(coord) {
+    /*
+     * have 3 bytes to work with for a THREE.Color
+     * 0xqqqrrr
+     * so store them as two 12-bit signed integers
+     * also all the other colors in the scene are zero, so we set the sign bit
+     * for zero to disambiguate
+     */
+    const {q, r} = coord;
+    const absQ = Math.abs(q);
+    const absR = Math.abs(r);
+
+    console.assert(absQ <= 0x7ff, "q coord too big", coord);
+    console.assert(absR <= 0x7ff, "r coord too big", coord);
+
+    let id = (absQ << 12) + absR;
+    if (q <= 0) {
+        id = id | (1 << 23);
     }
+    if (r <= 0) {
+        id = id | (1 << 11);
+    }
+    return id;
 }
 
-function init() {
-    /* from https://threejsfundamentals.org/threejs/lessons/threejs-fundamentals.html */
-    canvas = document.getElementById('canvas');
-    grid = initial_grid();
-    renderer = new THREE.WebGLRenderer({canvas});
-    rootObject = new THREE.Object3D();
-    scene = new THREE.Scene();
+function pickerIDToAxial(pixelBuffer) {
+    /* all zeroes means nothing got clicked on */
+    if ((pixelBuffer[0] === 0) &&
+        (pixelBuffer[1] === 0) &&
+        (pixelBuffer[2] === 0)) {
+        return null;
+    }
 
-    const fov = 75;
-    const aspect = canvas.width / canvas.height;
-    const near = 0.1;
-    const far = 100;
+    /* 0xqqqrrr is in first 3 bytes, seems big endian? */
+    let q = ((pixelBuffer[0] << 4) & 0x7f) | ((pixelBuffer[1] >> 4) & 0xf);
+    let r = ((pixelBuffer[1] & 0x7) << 8) | pixelBuffer[2];
 
-    camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+    /* sign bit is at the top of qqq */
+    if ((q !== 0) && ((pixelBuffer[0] & 0x80) !== 0)) {
+        q = q * -1;
+    }
+    /* sign bit is at the top of rrr */
+    if ((r !== 0) && ((pixelBuffer[1] & 0x8) !== 0)) {
+        r = r * -1;
+    }
+    return {q: q, r: r};
+}
 
-    camera.position.z = 12;
+function addHexGeometry(geometry, coord, radius) {
+    // const material = new THREE.MeshBasicMaterial({color: 0xaa00ff});
+    const material = new THREE.MeshPhongMaterial({
+        side: THREE.DoubleSide,
+        color: new THREE.Color(0x004400),
+    });
+    /* add 0.1 for a gap between the hexes */
+    const position = axialToPosition(coord, radius + 0.1);
 
-	scene.background = new THREE.Color(0xeeeeee);
+    const mesh = new THREE.Mesh(geometry, material);
 
-	rootObject.add(new THREE.HemisphereLight());
+    if (false) {
+      /* XXX: translating these things doesn't seem to work */
+      const axes = new THREE.AxesHelper();
+      axes.material.depthTest = false;
+      axes.renderOrder = 2;
+      mesh.add(axes);
+
+      const helper = new THREE.GridHelper(5, 5);
+      helper.material.depthTest = false;
+      helper.renderOrder = 1;
+      mesh.add(helper);
+    }
+
+    mesh.position.set(position.x, position.y, 0);
+    rootObject.add(mesh);
+
+    /*
+     * apparently a custom shader would be better because there wouldn't have
+     * to be any light calculations for this material
+     * https://threejsfundamentals.org/threejs/lessons/threejs-picking.html
+     * XXX: not sure why you overload emissive instead of color
+     */
+    const pickerID = axialToPickerID(coord);
+    const pickingMaterial = new THREE.MeshPhongMaterial({
+        emissive: new THREE.Color(pickerID),
+        color: new THREE.Color(0, 0, 0),
+        specular: new THREE.Color(0, 0, 0),
+        map: null,
+        transparent: true,
+        side: THREE.DoubleSide,
+        alphaTest: 0.5,
+        blending: THREE.NoBlending,
+    });
+    const pickerMesh = new THREE.Mesh(geometry, pickingMaterial);
+    pickerMesh.position.copy(mesh.position);
+    pickerMesh.rotation.copy(mesh.rotation);
+    pickerMesh.scale.copy(mesh.scale);
+    picker.rootObject.add(pickerMesh);
+}
+
+function addLights(scene) {
+	scene.add(new THREE.HemisphereLight());
 
     {
         const color = 0xFFFFFF;
@@ -109,36 +182,113 @@ function init() {
         light.position.set(1, -2, -4);
         scene.add(light);
     }
+}
 
+function onKeyDown(evt) {
+    console.log("keydown", evt.key);
 
-    const coords = JSON.parse(grid.get_coords_json());
-    for (let i = 0; i < coords.length; i++) {
-        const coord = coords[i];
-        const radius = 1;
-        const geometry = hexShape(radius);
-
-        const point = axialToPoint(coord, radius + 0.1);
-        console.log(coord, point);
-        geometry.translate(point.x, point.y, 0);
-
-        // const material = new THREE.MeshBasicMaterial({color: 0xaa00ff});
-        const material = new THREE.MeshPhongMaterial({
-            side: THREE.DoubleSide,
-        });
-
-        const hue = 0.55;
-        const saturation = 0.7;
-        const luminance = 0.1;
-        material.color.setHSL(hue, saturation, luminance);
-
-        const mesh = new THREE.Mesh(geometry, material);
-
-        rootObject.add(mesh);
+    let rootChanged = false;
+    switch (evt.key) {
+    case "w":
+        rootObject.rotation.x += 0.2;
+        rootChanged = true;
+        break;
+    case "a":
+        rootObject.rotation.z += 0.2;
+        rootChanged = true;
+        break;
+    case "s":
+        rootObject.rotation.x -= 0.2;
+        rootChanged = true;
+        break;
+    case "d":
+        rootObject.rotation.z -= 0.2;
+        rootChanged = true;
+        break;
     }
 
+    if (rootChanged) {
+        picker.rootObject.position.copy(rootObject.position);
+        picker.rootObject.rotation.copy(rootObject.rotation);
+        picker.rootObject.scale.copy(rootObject.scale);
+    }
+}
+
+function onMouseUp(evt) {
+    /* XXX: need to cache this rect? maybe only changes on resize? */
+    const rect = canvas.getBoundingClientRect();
+
+    /* converts to canvas coordinates with 0, 0 in top left */
+    const x = evt.clientX - rect.left;
+    const y = evt.clientY - rect.top;
+
+    /* render the picker scene to figure out what got clicked */
+    const pixelRatio = renderer.getPixelRatio();
+    const rendererCtx = renderer.getContext();
+    camera.setViewOffset(
+        rendererCtx.drawingBufferWidth,
+        rendererCtx.drawingBufferHeight,
+        x * pixelRatio,
+        y * pixelRatio,
+        1,
+        1,
+    );
+
+    /* render the picker version of the scene */
+    renderer.setRenderTarget(picker.target);
+    renderer.render(picker.scene, camera);
+
+    console.log(canvas.getContext('webgl'));
+    renderer.readRenderTargetPixels(
+        picker.target,
+        0, /* because of camera.setViewOffset, x offset is 0 */
+        0, /* ditto for y offset */
+        1,
+        1,
+        picker.pixelBuffer,
+    );
+
+    /* restore original */
+    renderer.setRenderTarget(null);
+    camera.clearViewOffset();
+
+    const coord = pickerIDToAxial(picker.pixelBuffer);
+    console.log(picker.pixelBuffer, x, y, coord);
+}
+
+function init() {
+    /* from https://threejsfundamentals.org/threejs/lessons/threejs-fundamentals.html */
+    canvas = document.getElementById('canvas');
+    grid = initial_grid();
+    renderer = new THREE.WebGLRenderer({canvas});
+
+    const fov = 75;
+    const aspect = canvas.width / canvas.height;
+    const near = 0.1;
+    const far = 100;
+
+    camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+
+    camera.position.z = 12;
+
+	scene.background = new THREE.Color(0xeeeeee);
+
+    const radius = 1;
+    const geometry = hexShape(radius);
+    const coords = JSON.parse(grid.get_coords_json());
+    for (let i = 0; i < coords.length; i++) {
+        addHexGeometry(geometry, coords[i], radius);
+    }
+
+    addLights(scene);
     scene.add(rootObject);
     renderer.render(scene, camera);
 
+    /* only render the picker.scene as needed for getting clicks */
+    picker.scene.background = new THREE.Color(0);
+    picker.scene.add(picker.rootObject);
+
+    window.addEventListener("mouseup", onMouseUp);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("resize", onWindowResize, false);
 }
