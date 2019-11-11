@@ -3,6 +3,8 @@ import * as THREE from "three";
 
 const SQRT3 = Math.sqrt(3);
 const HALF_SQRT3 = SQRT3 / 2;
+const HEX_COLOR = 0x004400;
+const SELECTED_HEX_COLOR = 0x330000;
 
 var debug = true;
 
@@ -15,10 +17,17 @@ var scene = new THREE.Scene();
 
 /* https://threejsfundamentals.org/threejs/lessons/threejs-picking.html */
 var picker = {
-    target: new THREE.WebGLRenderTarget(1, 1),
+    target: null,
     pixelBuffer: new Uint8Array(4),
     rootObject: new THREE.Object3D(),
     scene: new THREE.Scene(),
+
+    meshByCoord: {},
+    pickedMesh: null,
+
+    debug: true,
+    debugCanvas: null,
+    debugRenderer: null,
 };
 
 function onWindowResize() {
@@ -34,6 +43,27 @@ function onWindowResize() {
 
     /* apparently this can be expensive, so always check if needed first */
     renderer.setSize(width, height, false);
+}
+
+function addHexMesh(coord, mesh) {
+    let byR = picker.meshByCoord[coord.q];
+    if (!byR) {
+        byR = {};
+        byR[coord.r] = mesh;
+        picker.meshByCoord[coord.q] = byR;
+    }
+    else {
+        byR[coord.r] = mesh;
+    }
+}
+
+function getHexMesh(coord) {
+    const byR = picker.meshByCoord[coord.q];
+    if (!byR) {
+        return null;
+    }
+
+    return byR[coord.r];
 }
 
 function hexShape(size) {
@@ -118,7 +148,7 @@ function addHexGeometry(geometry, coord, radius) {
     // const material = new THREE.MeshBasicMaterial({color: 0xaa00ff});
     const material = new THREE.MeshPhongMaterial({
         side: THREE.DoubleSide,
-        color: new THREE.Color(0x004400),
+        color: HEX_COLOR,
     });
     /* add 0.1 for a gap between the hexes */
     const position = axialToPosition(coord, radius + 0.1);
@@ -139,6 +169,7 @@ function addHexGeometry(geometry, coord, radius) {
     }
 
     mesh.position.set(position.x, position.y, 0);
+    addHexMesh(coord, mesh);
     rootObject.add(mesh);
 
     /*
@@ -211,49 +242,56 @@ function onKeyDown(evt) {
         picker.rootObject.position.copy(rootObject.position);
         picker.rootObject.rotation.copy(rootObject.rotation);
         picker.rootObject.scale.copy(rootObject.scale);
+        renderPicker();
     }
 }
 
-function onMouseUp(evt) {
+function onMouseMove(evt) {
     /* XXX: need to cache this rect? maybe only changes on resize? */
     const rect = canvas.getBoundingClientRect();
+    const rendererCtx = renderer.getContext();
 
-    /* converts to canvas coordinates with 0, 0 in top left */
+    /* readRenderTargetPixels is from the lower left so y is flipped */
     const x = evt.clientX - rect.left;
-    const y = evt.clientY - rect.top;
+    const y = rendererCtx.drawingBufferHeight- (evt.clientY - rect.top);
 
     /* render the picker scene to figure out what got clicked */
     const pixelRatio = renderer.getPixelRatio();
-    const rendererCtx = renderer.getContext();
-    camera.setViewOffset(
-        rendererCtx.drawingBufferWidth,
-        rendererCtx.drawingBufferHeight,
-        x * pixelRatio,
-        y * pixelRatio,
-        1,
-        1,
-    );
 
-    /* render the picker version of the scene */
-    renderer.setRenderTarget(picker.target);
-    renderer.render(picker.scene, camera);
-
-    console.log(canvas.getContext('webgl'));
     renderer.readRenderTargetPixels(
         picker.target,
-        0, /* because of camera.setViewOffset, x offset is 0 */
-        0, /* ditto for y offset */
+        x * pixelRatio, /* because of camera.setViewOffset, x offset is 0 */
+        y * pixelRatio, /* ditto for y offset */
         1,
         1,
         picker.pixelBuffer,
     );
 
-    /* restore original */
-    renderer.setRenderTarget(null);
-    camera.clearViewOffset();
-
     const coord = pickerIDToAxial(picker.pixelBuffer);
-    console.log(picker.pixelBuffer, x, y, coord);
+    if (coord) {
+        const mesh = getHexMesh(coord);
+        if (mesh) {
+            if (picker.pickedMesh) {
+                picker.pickedMesh.material.color.setHex(HEX_COLOR);
+            }
+            picker.pickedMesh = mesh;
+
+            mesh.material.color.setHex(SELECTED_HEX_COLOR);
+        }
+    }
+
+}
+
+function initPickerDebug(canvasElemID) {
+    if (!picker.debug) {
+        return;
+    }
+
+    picker.debugCanvas = document.getElementById(canvasElemID);
+    picker.debugCanvas.style.display = "block";
+    picker.debugRenderer = new THREE.WebGLRenderer(
+        {canvas: picker.debugCanvas},
+    );
 }
 
 function init() {
@@ -261,6 +299,14 @@ function init() {
     canvas = document.getElementById('canvas');
     grid = initial_grid();
     renderer = new THREE.WebGLRenderer({canvas});
+
+    const rendererCtx = renderer.getContext();
+    picker.target = new THREE.WebGLRenderTarget(
+        rendererCtx.drawingBufferWidth,
+        rendererCtx.drawingBufferHeight,
+    );
+
+    initPickerDebug('picker-canvas');
 
     const fov = 75;
     const aspect = canvas.width / canvas.height;
@@ -288,7 +334,9 @@ function init() {
     picker.scene.background = new THREE.Color(0);
     picker.scene.add(picker.rootObject);
 
-    window.addEventListener("mouseup", onMouseUp);
+    renderPicker();
+
+    window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("resize", onWindowResize, false);
 }
@@ -298,6 +346,19 @@ function render() {
     requestAnimationFrame(render);
 }
 
+/* try to only render picker version when needed */
+function renderPicker() {
+    if (picker.debug) {
+        picker.debugRenderer.render(picker.scene, camera);
+    }
+
+    /* render the picker version of the scene */
+    renderer.setRenderTarget(picker.target);
+    renderer.render(picker.scene, camera);
+
+    /* restore original */
+    renderer.setRenderTarget(null);
+}
 
 console.log(THREE.REVISION);
 init();
