@@ -6,3 +6,7 @@ test:
 
 run:
 	cd www && npm run start
+
+# misc installing stuff here
+# npm install typescript --save-dev
+# npm install ts-loader --save-dev
