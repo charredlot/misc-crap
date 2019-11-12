@@ -1,4 +1,7 @@
+'use strict';
+
 import { initial_grid } from "hexgrid";
+import { Picker } from "!ts-loader!./mouse-canvas-picker.ts";
 import * as THREE from "three";
 
 const SQRT3 = Math.sqrt(3);
@@ -15,20 +18,7 @@ var renderer;
 var rootObject = new THREE.Object3D();
 var scene = new THREE.Scene();
 
-/* https://threejsfundamentals.org/threejs/lessons/threejs-picking.html */
-var picker = {
-    target: null,
-    pixelBuffer: new Uint8Array(4),
-    rootObject: new THREE.Object3D(),
-    scene: new THREE.Scene(),
-
-    meshByCoord: {},
-    pickedMesh: null,
-
-    debug: true,
-    debugCanvas: null,
-    debugRenderer: null,
-};
+var picker;
 
 function onWindowResize() {
     const width = canvas.clientWidth;
@@ -43,27 +33,6 @@ function onWindowResize() {
 
     /* apparently this can be expensive, so always check if needed first */
     renderer.setSize(width, height, false);
-}
-
-function addHexMesh(coord, mesh) {
-    let byR = picker.meshByCoord[coord.q];
-    if (!byR) {
-        byR = {};
-        byR[coord.r] = mesh;
-        picker.meshByCoord[coord.q] = byR;
-    }
-    else {
-        byR[coord.r] = mesh;
-    }
-}
-
-function getHexMesh(coord) {
-    const byR = picker.meshByCoord[coord.q];
-    if (!byR) {
-        return null;
-    }
-
-    return byR[coord.r];
 }
 
 function hexShape(size) {
@@ -169,7 +138,7 @@ function addHexGeometry(geometry, coord, radius) {
     }
 
     mesh.position.set(position.x, position.y, 0);
-    addHexMesh(coord, mesh);
+    picker.addHexMesh(coord, mesh);
     rootObject.add(mesh);
 
     /*
@@ -239,37 +208,24 @@ function onKeyDown(evt) {
     }
 
     if (rootChanged) {
-        picker.rootObject.position.copy(rootObject.position);
-        picker.rootObject.rotation.copy(rootObject.rotation);
-        picker.rootObject.scale.copy(rootObject.scale);
-        renderPicker();
+        picker.render({
+            renderer: renderer,
+            camera: camera,
+            sourceRootObject: rootObject,
+        });
     }
 }
 
 function onMouseMove(evt) {
-    /* XXX: need to cache this rect? maybe only changes on resize? */
-    const rect = canvas.getBoundingClientRect();
-    const rendererCtx = renderer.getContext();
+    const pixelBuffer = picker.readMousePixels({
+        canvas: canvas,
+        renderer: renderer,
+        evt: evt,
+    });
 
-    /* readRenderTargetPixels is from the lower left so y is flipped */
-    const x = evt.clientX - rect.left;
-    const y = rendererCtx.drawingBufferHeight- (evt.clientY - rect.top);
-
-    /* render the picker scene to figure out what got clicked */
-    const pixelRatio = renderer.getPixelRatio();
-
-    renderer.readRenderTargetPixels(
-        picker.target,
-        x * pixelRatio, /* because of camera.setViewOffset, x offset is 0 */
-        y * pixelRatio, /* ditto for y offset */
-        1,
-        1,
-        picker.pixelBuffer,
-    );
-
-    const coord = pickerIDToAxial(picker.pixelBuffer);
+    const coord = pickerIDToAxial(pixelBuffer);
     if (coord) {
-        const mesh = getHexMesh(coord);
+        const mesh = picker.getHexMesh(coord);
         if (mesh) {
             if (picker.pickedMesh) {
                 picker.pickedMesh.material.color.setHex(HEX_COLOR);
@@ -282,18 +238,6 @@ function onMouseMove(evt) {
 
 }
 
-function initPickerDebug(canvasElemID) {
-    if (!picker.debug) {
-        return;
-    }
-
-    picker.debugCanvas = document.getElementById(canvasElemID);
-    picker.debugCanvas.style.display = "block";
-    picker.debugRenderer = new THREE.WebGLRenderer(
-        {canvas: picker.debugCanvas},
-    );
-}
-
 function init() {
     /* from https://threejsfundamentals.org/threejs/lessons/threejs-fundamentals.html */
     canvas = document.getElementById('canvas');
@@ -301,12 +245,18 @@ function init() {
     renderer = new THREE.WebGLRenderer({canvas});
 
     const rendererCtx = renderer.getContext();
-    picker.target = new THREE.WebGLRenderTarget(
-        rendererCtx.drawingBufferWidth,
-        rendererCtx.drawingBufferHeight,
-    );
-
-    initPickerDebug('picker-canvas');
+    picker = new Picker({
+        renderTarget: new THREE.WebGLRenderTarget(
+            rendererCtx.drawingBufferWidth,
+            rendererCtx.drawingBufferHeight,
+        ),
+        rootObject: new THREE.Object3D(),
+        scene: new THREE.Scene(),
+        debugCanvas: (debug
+                      ? document.getElementById('picker-canvas')
+                      : undefined),
+    });
+    console.log(picker);
 
     const fov = 75;
     const aspect = canvas.width / canvas.height;
@@ -331,10 +281,10 @@ function init() {
     renderer.render(scene, camera);
 
     /* only render the picker.scene as needed for getting clicks */
-    picker.scene.background = new THREE.Color(0);
-    picker.scene.add(picker.rootObject);
-
-    renderPicker();
+    picker.render({
+        renderer: renderer,
+        camera: camera,
+    });
 
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("keydown", onKeyDown);
@@ -344,20 +294,6 @@ function init() {
 function render() {
     renderer.render(scene, camera);
     requestAnimationFrame(render);
-}
-
-/* try to only render picker version when needed */
-function renderPicker() {
-    if (picker.debug) {
-        picker.debugRenderer.render(picker.scene, camera);
-    }
-
-    /* render the picker version of the scene */
-    renderer.setRenderTarget(picker.target);
-    renderer.render(picker.scene, camera);
-
-    /* restore original */
-    renderer.setRenderTarget(null);
 }
 
 console.log(THREE.REVISION);
