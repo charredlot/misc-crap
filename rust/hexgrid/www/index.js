@@ -1,5 +1,7 @@
 'use strict';
 
+/* XXX: figure out ts-loader */
+import { HexGridPicker } from "!ts-loader!./hexgrid-utils.ts";
 import { initial_grid } from "hexgrid";
 import { Picker } from "!ts-loader!./mouse-canvas-picker.ts";
 import * as THREE from "three";
@@ -19,6 +21,7 @@ var rootObject = new THREE.Object3D();
 var scene = new THREE.Scene();
 
 var picker;
+var hexGridPicker = new HexGridPicker();
 
 function onWindowResize() {
     const width = canvas.clientWidth;
@@ -65,54 +68,6 @@ function axialToPosition(coord, radius) {
     }
 }
 
-function axialToPickerID(coord) {
-    /*
-     * have 3 bytes to work with for a THREE.Color
-     * 0xqqqrrr
-     * so store them as two 12-bit signed integers
-     * also all the other colors in the scene are zero, so we set the sign bit
-     * for zero to disambiguate
-     */
-    const {q, r} = coord;
-    const absQ = Math.abs(q);
-    const absR = Math.abs(r);
-
-    console.assert(absQ <= 0x7ff, "q coord too big", coord);
-    console.assert(absR <= 0x7ff, "r coord too big", coord);
-
-    let id = (absQ << 12) + absR;
-    if (q <= 0) {
-        id = id | (1 << 23);
-    }
-    if (r <= 0) {
-        id = id | (1 << 11);
-    }
-    return id;
-}
-
-function pickerIDToAxial(pixelBuffer) {
-    /* all zeroes means nothing got clicked on */
-    if ((pixelBuffer[0] === 0) &&
-        (pixelBuffer[1] === 0) &&
-        (pixelBuffer[2] === 0)) {
-        return null;
-    }
-
-    /* 0xqqqrrr is in first 3 bytes, seems big endian? */
-    let q = ((pixelBuffer[0] << 4) & 0x7f) | ((pixelBuffer[1] >> 4) & 0xf);
-    let r = ((pixelBuffer[1] & 0x7) << 8) | pixelBuffer[2];
-
-    /* sign bit is at the top of qqq */
-    if ((q !== 0) && ((pixelBuffer[0] & 0x80) !== 0)) {
-        q = q * -1;
-    }
-    /* sign bit is at the top of rrr */
-    if ((r !== 0) && ((pixelBuffer[1] & 0x8) !== 0)) {
-        r = r * -1;
-    }
-    return {q: q, r: r};
-}
-
 function addHexGeometry(geometry, coord, radius) {
     // const material = new THREE.MeshBasicMaterial({color: 0xaa00ff});
     const material = new THREE.MeshPhongMaterial({
@@ -138,8 +93,10 @@ function addHexGeometry(geometry, coord, radius) {
     }
 
     mesh.position.set(position.x, position.y, 0);
-    picker.addHexMesh(coord, mesh);
     rootObject.add(mesh);
+
+    /* so we can change the mesh later */
+    hexGridPicker.addHexMesh(coord, mesh);
 
     /*
      * apparently a custom shader would be better because there wouldn't have
@@ -147,9 +104,8 @@ function addHexGeometry(geometry, coord, radius) {
      * https://threejsfundamentals.org/threejs/lessons/threejs-picking.html
      * XXX: not sure why you overload emissive instead of color
      */
-    const pickerID = axialToPickerID(coord);
     const pickingMaterial = new THREE.MeshPhongMaterial({
-        emissive: new THREE.Color(pickerID),
+        emissive: HexGridPicker.axialCoordToPickerID(coord),
         color: new THREE.Color(0, 0, 0),
         specular: new THREE.Color(0, 0, 0),
         map: null,
@@ -223,14 +179,14 @@ function onMouseMove(evt) {
         evt: evt,
     });
 
-    const coord = pickerIDToAxial(pixelBuffer);
+    const coord = HexGridPicker.pickerIDToAxialCoord(pixelBuffer);
     if (coord) {
-        const mesh = picker.getHexMesh(coord);
+        const mesh = hexGridPicker.getHexMesh(coord);
         if (mesh) {
-            if (picker.pickedMesh) {
-                picker.pickedMesh.material.color.setHex(HEX_COLOR);
+            if (hexGridPicker.currMesh) {
+                hexGridPicker.currMesh.material.color.setHex(HEX_COLOR);
             }
-            picker.pickedMesh = mesh;
+            hexGridPicker.currMesh = mesh;
 
             mesh.material.color.setHex(SELECTED_HEX_COLOR);
         }
@@ -256,7 +212,6 @@ function init() {
                       ? document.getElementById('picker-canvas')
                       : undefined),
     });
-    console.log(picker);
 
     const fov = 75;
     const aspect = canvas.width / canvas.height;

@@ -7,12 +7,6 @@ export interface PickerProps {
     debugCanvas?: HTMLCanvasElement,
 }
 
-/* XXX: put this elsewhere*/
-export interface AxialCoord {
-    q: number,
-    r: number,
-}
-
 /*
  * this approach cribbed from threejs fundamentals
  * https://threejsfundamentals.org/threejs/lessons/threejs-picking.html
@@ -22,9 +16,6 @@ export class Picker implements PickerProps {
     rootObject: THREE.Object3D;
     scene: THREE.Scene;
     pixelBuffer: Uint8Array;
-
-    meshByCoord: {[key: number]: {[key: number]: THREE.Mesh}};
-    currMesh?: THREE.Mesh;
 
     debugCanvas?: HTMLCanvasElement;
     debugRenderer?: THREE.WebGLRenderer;
@@ -36,8 +27,6 @@ export class Picker implements PickerProps {
 
         this.pixelBuffer = new Uint8Array(4);
 
-        this.meshByCoord = {};
-
         this.scene.background = new THREE.Color(0);
         this.scene.add(this.rootObject);
 
@@ -48,27 +37,6 @@ export class Picker implements PickerProps {
                 {canvas: this.debugCanvas},
             );
         }
-    }
-
-    addHexMesh({q, r}: AxialCoord, mesh: THREE.Mesh): void {
-        let byR = this.meshByCoord[q];
-        if (!byR) {
-            byR = {};
-            byR[r] = mesh;
-            this.meshByCoord[q] = byR;
-        }
-        else {
-            byR[r] = mesh;
-        }
-    }
-
-    getHexMesh({q, r}: AxialCoord): THREE.Mesh | null {
-        const byR: any = this.meshByCoord[q];
-        if (!byR) {
-            return null;
-        }
-
-        return byR[r];
     }
 
     /* XXX: not sure when/why to use a different renderer vs setting target */
