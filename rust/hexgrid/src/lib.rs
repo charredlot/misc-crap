@@ -1,5 +1,6 @@
 use wasm_bindgen::prelude::*;
 
+mod game;
 mod hex;
 mod misc;
 
