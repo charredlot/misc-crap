@@ -5,6 +5,8 @@ import { HexGridPicker } from "!ts-loader!./hexgrid-utils.ts";
 import { initial_grid } from "hexgrid";
 import { Picker } from "!ts-loader!./mouse-canvas-picker.ts";
 import * as THREE from "three";
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+
 
 const SQRT3 = Math.sqrt(3);
 const HALF_SQRT3 = SQRT3 / 2;
@@ -15,6 +17,7 @@ var debug = true;
 
 var camera;
 var canvas;
+var controls;
 var grid;
 var renderer;
 var rootObject = new THREE.Object3D();
@@ -142,34 +145,6 @@ function addLights(scene) {
 
 function onKeyDown(evt) {
     console.log("keydown", evt.key);
-
-    let rootChanged = false;
-    switch (evt.key) {
-    case "w":
-        rootObject.rotation.x += 0.2;
-        rootChanged = true;
-        break;
-    case "a":
-        rootObject.rotation.z += 0.2;
-        rootChanged = true;
-        break;
-    case "s":
-        rootObject.rotation.x -= 0.2;
-        rootChanged = true;
-        break;
-    case "d":
-        rootObject.rotation.z -= 0.2;
-        rootChanged = true;
-        break;
-    }
-
-    if (rootChanged) {
-        picker.render({
-            renderer: renderer,
-            camera: camera,
-            sourceRootObject: rootObject,
-        });
-    }
 }
 
 function onMouseMove(evt) {
@@ -222,6 +197,9 @@ function init() {
 
     camera.position.z = 12;
 
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.screenSpacePanning = true;
+
 	scene.background = new THREE.Color(0xeeeeee);
 
     const radius = 1;
@@ -247,7 +225,14 @@ function init() {
 }
 
 function render() {
+    controls.update();
     renderer.render(scene, camera);
+    /* XXX: figure out how to hook onto what OrbitControls does */
+    picker.render({
+        renderer: renderer,
+        camera: camera,
+        sourceRootObject: rootObject,
+    });
     requestAnimationFrame(render);
 }
 
