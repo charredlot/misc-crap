@@ -19,7 +19,6 @@ var battle;
 var camera;
 var canvas;
 var controls;
-var grid;
 var renderer;
 var rootObject = new THREE.Object3D();
 var scene = new THREE.Scene();
@@ -172,7 +171,7 @@ function onMouseMove(evt) {
 
 function init() {
     battle = initial_battle();
-    grid = battle.grid;
+    console.log(battle);
 
     /* from https://threejsfundamentals.org/threejs/lessons/threejs-fundamentals.html */
     canvas = document.getElementById('canvas');
@@ -207,7 +206,7 @@ function init() {
 
     const radius = 1;
     const geometry = hexShape(radius);
-    const coords = JSON.parse(grid.get_coords_json());
+    const coords = JSON.parse(battle.get_grid_coords_json());
     for (let i = 0; i < coords.length; i++) {
         addHexGeometry(geometry, coords[i], radius);
     }

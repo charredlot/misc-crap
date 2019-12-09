@@ -7,6 +7,10 @@ pub mod turn;
 pub type ActionPoints = u64;
 
 pub struct Battle {
+    /*
+     * there's some issue about Copy being required for pub structs
+     * https://github.com/rustwasm/wasm-bindgen/issues/439
+     */
     pub grid: HexGrid,
     events: EventQueue,
 }
