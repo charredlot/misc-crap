@@ -1,7 +1,9 @@
 use super::event::{Event, EventOrder, EventQueue, EventTime, Priority};
+use super::ActionPoints;
 
 struct Turn {
     time: EventTime,
+    ap: ActionPoints,
 }
 
 fn insert_turn(q: &mut EventQueue, turn: Turn) {
@@ -27,7 +29,10 @@ mod tests {
     fn test_event_queue_panic() {
         let mut q = EventQueue::new();
         for _ in 0..2 {
-            insert_turn(&mut q, Turn{time: 10 as EventTime});
+            insert_turn(&mut q, Turn{
+                time: 10 as EventTime,
+                ap: 0 as ActionPoints,
+            });
         }
 
         q.advance();
@@ -40,7 +45,10 @@ mod tests {
     fn test_event_queue() {
         let mut q = EventQueue::new();
         for _ in 0..2 {
-            insert_turn(&mut q, Turn{time: 10 as EventTime});
+            insert_turn(&mut q, Turn{
+                time: 10 as EventTime,
+                ap: 0 as ActionPoints,
+            });
         }
 
         let (_, e) = q.advance();

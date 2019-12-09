@@ -2,7 +2,7 @@
 
 /* XXX: figure out ts-loader */
 import { HexGridPicker } from "!ts-loader!./hexgrid-utils.ts";
-import { initial_grid } from "hexgrid";
+import { initial_battle } from "hexgrid";
 import { Picker } from "!ts-loader!./mouse-canvas-picker.ts";
 import * as THREE from "three";
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -15,6 +15,7 @@ const SELECTED_HEX_COLOR = 0x330000;
 
 var debug = true;
 
+var battle;
 var camera;
 var canvas;
 var controls;
@@ -170,9 +171,11 @@ function onMouseMove(evt) {
 }
 
 function init() {
+    battle = initial_battle();
+    grid = battle.grid;
+
     /* from https://threejsfundamentals.org/threejs/lessons/threejs-fundamentals.html */
     canvas = document.getElementById('canvas');
-    grid = initial_grid();
     renderer = new THREE.WebGLRenderer({canvas});
 
     const rendererCtx = renderer.getContext();
