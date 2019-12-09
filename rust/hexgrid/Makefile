@@ -2,7 +2,8 @@ wasm:
 	wasm-pack build
 
 test:
-	RUST_BACKTRACE=full cargo test -- --nocapture
+	#RUST_BACKTRACE=full cargo test -- --nocapture
+	RUST_BACKTRACE=full cargo test
 
 run:
 	cd www && npm run start
