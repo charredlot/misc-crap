@@ -1,9 +1,40 @@
-use super::event::{Event, EventOrder, EventQueue, EventTime, Priority};
-use super::ActionPoints;
+use wasm_bindgen::prelude::*;
 
-struct Turn {
-    time: EventTime,
-    ap: ActionPoints,
+use super::ActionPoints;
+use super::event::{Event, EventOrder, EventQueue, EventTime, Priority};
+use super::unit::{BattleUnit, BattleUnitKey};
+
+#[wasm_bindgen]
+pub struct Turn {
+    /* key can't be pub https://github.com/rustwasm/wasm-bindgen/issues/1775 */
+    unit_key: BattleUnitKey,
+    pub ap: ActionPoints,
+    pub time: EventTime,
+}
+
+#[wasm_bindgen]
+impl Turn {
+    #[wasm_bindgen(getter)]
+    pub fn unit_key(&self) -> String {
+        self.unit_key.clone()
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_unit_key(&mut self, unit_key: String) {
+        self.unit_key = unit_key;
+    }
+}
+
+impl Turn {
+    pub fn new(unit_key: BattleUnitKey,
+            ap: ActionPoints,
+            time: EventTime) -> Turn {
+        Turn{
+            unit_key: unit_key,
+            ap: ap,
+            time: time,
+        }
+    }
 }
 
 fn insert_turn(q: &mut EventQueue, turn: Turn) {
@@ -32,6 +63,7 @@ mod tests {
             insert_turn(&mut q, Turn{
                 time: 10 as EventTime,
                 ap: 0 as ActionPoints,
+                unit_key: String::from("a") as BattleUnitKey,
             });
         }
 
@@ -48,6 +80,7 @@ mod tests {
             insert_turn(&mut q, Turn{
                 time: 10 as EventTime,
                 ap: 0 as ActionPoints,
+                unit_key: String::from("a") as BattleUnitKey,
             });
         }
 

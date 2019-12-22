@@ -3,8 +3,10 @@ use event::EventQueue;
 
 pub mod event;
 pub mod turn;
+pub mod unit;
 
 pub type ActionPoints = u64;
+pub type HitPoints = u64;
 
 pub struct Battle {
     /*
