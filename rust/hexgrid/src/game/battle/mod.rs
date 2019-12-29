@@ -1,5 +1,5 @@
 use crate::hex::grid::HexGrid;
-use event::{Event, EventOrder, EventQueue, EventTime, NullEvent, Priority};
+use event::{Event, EventKey, EventOrder, EventQueue, EventTime, NullEvent, Priority};
 use input::{Input};
 
 pub mod event;
@@ -26,7 +26,7 @@ impl Battle {
         Battle{
             grid: grid,
             events: EventQueue::new(),
-            curr_event: Box::new(NullEvent{}),
+            curr_event: Box::new(NullEvent::new()),
             needs_input: false,
         }
     }
@@ -71,6 +71,8 @@ mod tests {
             fn activate(&self,
                         battle: &mut Battle,
                         input: Option<Box<dyn Input>>) {}
+            fn event_key(&self) -> EventKey { EventKey::zero() }
+            fn set_event_key(&mut self, key: EventKey) {}
         }
 
         let mut b = Battle::new(HexGrid::new());

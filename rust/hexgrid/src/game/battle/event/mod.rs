@@ -21,9 +21,18 @@ pub type EventTime = u64;
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct EventOrder {
     /* order of fields matters for Ord */
-    time: EventTime,
-    priority: Priority,
-    ctr: u64, /* ctr only to break ties */
+    pub time: EventTime,
+    pub priority: Priority,
+    pub ctr: u64, /* ctr only to break ties */
+}
+
+pub type EventKey = EventOrder;
+
+impl EventKey {
+    /* makes implementing test stuff easier */
+    pub fn zero() -> EventKey {
+        EventKey{time: 0, priority: Priority::Immediate, ctr: 0}
+    }
 }
 
 pub struct BoxEvent {
@@ -33,6 +42,10 @@ pub struct BoxEvent {
 pub trait Event {
     fn needs_input(&self) -> bool;
     fn activate(&self, battle: &mut Battle, input: Option<Box<dyn Input>>);
+
+    /* some boilerplate but probably worth */
+    fn event_key(&self) -> EventKey;
+    fn set_event_key(&mut self, key: EventKey);
 }
 
 pub struct EventQueue {
@@ -50,13 +63,14 @@ impl EventQueue {
     pub fn insert(&mut self,
                   offset: EventTime,
                   priority: Priority,
-                  event: Box<dyn Event>) -> EventOrder {
+                  mut event: Box<dyn Event>) -> EventOrder {
         self.ctr += 1;
         let order = EventOrder{
             time: self.time + offset,
             priority: priority,
             ctr: self.ctr,
         };
+        event.set_event_key(order as EventKey);
         self.q.insert(order, event);
 
         return order;
@@ -74,11 +88,26 @@ impl EventQueue {
 
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug)]
-pub struct NullEvent {}
+pub struct NullEvent {
+    pub key: EventKey,
+}
+
+impl NullEvent {
+    pub fn new() -> NullEvent {
+        NullEvent{
+            key: EventKey{time: 0, priority: Priority::Immediate, ctr: 0},
+        }
+    }
+}
 
 impl Event for NullEvent {
     fn needs_input(&self) -> bool { return false; }
+
     fn activate(&self, battle: &mut Battle, input: Option<Box<dyn Input>>) {}
+
+    fn event_key(&self) -> EventKey { self.key }
+
+    fn set_event_key(&mut self, key: EventKey) { self.key = key; }
 }
 
 #[cfg(test)]
@@ -127,9 +156,14 @@ mod tests {
         type TestEvent = u64;
         impl Event for TestEvent {
             fn needs_input(&self) -> bool { return false; }
+
             fn activate(&self,
                         battle: &mut Battle,
                         input: Option<Box<dyn Input>>) {}
+
+            fn event_key(&self) -> EventKey { EventKey::zero() }
+
+            fn set_event_key(&mut self, key: EventKey) {}
         }
 
         let tests = [
