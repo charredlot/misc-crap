@@ -2,6 +2,8 @@ use wasm_bindgen::prelude::*;
 
 use std::collections::{BTreeMap};
 
+use crate::game::battle::{Battle};
+use crate::game::battle::input::{Input};
 
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
@@ -24,20 +26,24 @@ pub struct EventOrder {
     ctr: u64, /* ctr only to break ties */
 }
 
+pub struct BoxEvent {
+    pub event: Box<Event>,
+}
+
 pub trait Event {
     fn needs_input(&self) -> bool;
+    fn activate(&self, battle: &mut Battle, input: Option<Box<dyn Input>>);
 }
 
 pub struct EventQueue {
     q: BTreeMap<EventOrder, Box<dyn Event>>,
     time: u64,
     ctr: u64,
-    needs_input: bool,
 }
 
 impl EventQueue {
     pub fn new() -> EventQueue {
-        EventQueue{q: BTreeMap::new(), time: 0, ctr: 0, needs_input: false}
+        EventQueue{q: BTreeMap::new(), time: 0, ctr: 0}
     }
 
     /* the return value will always be unique because BTreeMap requires it */
@@ -56,21 +62,23 @@ impl EventQueue {
         return order;
     }
 
-    pub fn input_processed(&mut self) {
-        self.needs_input = false;
-    }
-
     pub fn advance(&mut self) -> (EventOrder, Box<dyn Event>) {
-        assert!(!self.needs_input);
-
         /* XXX: there doesn't seem to be a better way to pop */
         let order = self.q.keys().next().unwrap().clone();
         /* should be a hard error if advance is called while empty */
         let event = self.q.remove(&order).unwrap();
         self.time = order.time;
-        self.needs_input = event.needs_input();
         return (order, event);
     }
+}
+
+#[wasm_bindgen]
+#[derive(Clone, Copy, Debug)]
+pub struct NullEvent {}
+
+impl Event for NullEvent {
+    fn needs_input(&self) -> bool { return false; }
+    fn activate(&self, battle: &mut Battle, input: Option<Box<dyn Input>>) {}
 }
 
 #[cfg(test)]
@@ -119,6 +127,9 @@ mod tests {
         type TestEvent = u64;
         impl Event for TestEvent {
             fn needs_input(&self) -> bool { return false; }
+            fn activate(&self,
+                        battle: &mut Battle,
+                        input: Option<Box<dyn Input>>) {}
         }
 
         let tests = [
@@ -177,28 +188,5 @@ mod tests {
                            "event queue test {} failed", i);
             }
         }
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_input_event() {
-        type TestInputEvent = u32;
-        impl Event for TestInputEvent {
-            fn needs_input(&self) -> bool { return true; }
-        }
-
-        let mut q = EventQueue::new();
-        for _ in 0..2 {
-            q.insert(
-                1 as EventTime,
-                Priority::Turn,
-                Box::new(0 as TestInputEvent),
-            );
-        }
-
-        q.advance();
-
-        /* this should fail since it should be waiting for input */
-        q.advance();
     }
 }

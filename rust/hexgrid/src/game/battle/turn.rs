@@ -1,10 +1,13 @@
 use wasm_bindgen::prelude::*;
 
+use crate::game::battle::input::{Input};
 use super::ActionPoints;
+use super::{Battle};
 use super::event::{Event, EventOrder, EventQueue, EventTime, Priority};
 use super::unit::{BattleUnit, BattleUnitKey};
 
 #[wasm_bindgen]
+#[derive(Clone, Debug)]
 pub struct Turn {
     /* key can't be pub https://github.com/rustwasm/wasm-bindgen/issues/1775 */
     unit_key: BattleUnitKey,
@@ -37,56 +40,58 @@ impl Turn {
     }
 }
 
-fn insert_turn(q: &mut EventQueue, turn: Turn) {
-    q.insert(
-        turn.time,
-        Priority::Turn,
-        Box::new(turn),
-    );
+fn insert_turn(battle: &mut Battle, turn: Turn) {
+    battle.insert_event(turn.time, Priority::Turn, Box::new(turn));
 }
 
 impl Event for Turn {
     fn needs_input(&self) -> bool {
         return true;
     }
+
+    fn activate(&self, battle: &mut Battle, input: Option<Box<dyn Input>>) {
+        /* TODO */
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::game::battle::{Battle};
+    use crate::game::battle::input::{EndTurnInput};
+    use crate::hex::grid::{HexGrid};
     use super::*;
 
     #[test]
     #[should_panic]
-    fn test_event_queue_panic() {
-        let mut q = EventQueue::new();
+    fn test_input_panic() {
+        let mut b = Battle::new(HexGrid::new());
         for _ in 0..2 {
-            insert_turn(&mut q, Turn{
+            insert_turn(&mut b, Turn{
                 time: 10 as EventTime,
                 ap: 0 as ActionPoints,
                 unit_key: String::from("a") as BattleUnitKey,
             });
         }
 
-        q.advance();
+        b.advance(None);
 
         /* this should fail since it should be waiting for input */
-        q.advance();
+        b.advance(None);
     }
 
     #[test]
-    fn test_event_queue() {
-        let mut q = EventQueue::new();
+    fn test_input() {
+        let mut b = Battle::new(HexGrid::new());
         for _ in 0..2 {
-            insert_turn(&mut q, Turn{
+            insert_turn(&mut b, Turn{
                 time: 10 as EventTime,
                 ap: 0 as ActionPoints,
                 unit_key: String::from("a") as BattleUnitKey,
             });
         }
 
-        let (_, e) = q.advance();
-        assert!(e.needs_input());
-        q.input_processed();
-        q.advance();
+        let _ = b.advance(None);
+        assert!(b.peek_event().needs_input());
+        b.advance(Some(Box::new(EndTurnInput{})));
     }
 }
