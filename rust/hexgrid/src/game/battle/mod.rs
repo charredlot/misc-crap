@@ -1,6 +1,10 @@
+use std::collections::{HashMap};
+
 use crate::hex::grid::HexGrid;
 use event::{Event, EventKey, EventOrder, EventQueue, EventTime, NullEvent, Priority};
 use input::{Input};
+use turn::{Turn};
+use unit::{BattleUnit, BattleUnitKey};
 
 pub mod event;
 pub mod input;
@@ -19,6 +23,9 @@ pub struct Battle {
     events: EventQueue,
     curr_event: Box<dyn Event>,
     needs_input: bool,
+    pub units: HashMap<BattleUnitKey, BattleUnit>,
+    unit_key_ctr: u64,
+    pub next_turn: HashMap<BattleUnitKey, EventKey>,
 }
 
 impl Battle {
@@ -28,18 +35,44 @@ impl Battle {
             events: EventQueue::new(),
             curr_event: Box::new(NullEvent::new()),
             needs_input: false,
+            units: HashMap::new(),
+            unit_key_ctr: 0,
+            next_turn: HashMap::new(),
         }
     }
 
     pub fn insert_event(&mut self,
                         offset: EventTime,
                         priority: Priority,
-                        event: Box<dyn Event>) -> EventOrder {
+                        event: Box<dyn Event>) -> EventKey {
         self.events.insert(offset, priority, event)
     }
 
     pub fn peek_event(&self) -> &dyn Event {
         &*self.curr_event
+    }
+
+    pub fn new_unit_key(&mut self, base_key: BattleUnitKey) -> BattleUnitKey {
+        self.unit_key_ctr += 1;
+        return format!("{}_{}", &base_key, self.unit_key_ctr);
+    }
+
+    pub fn insert_unit(&mut self, unit: BattleUnit) {
+        let key = unit.key();
+
+        assert!(!self.units.contains_key(&key));
+
+        self.units.insert(key, unit);
+    }
+
+    pub fn insert_unit_turn(&mut self,
+                            offset: EventTime,
+                            turn: Turn) -> EventKey{
+        let unit_key = turn.unit_key();
+        assert!(self.units.contains_key(&unit_key));
+        let key = self.insert_event(offset, Priority::Turn, Box::new(turn));
+        self.next_turn.insert(unit_key, key);
+        return key;
     }
 
     pub fn advance(&mut self,

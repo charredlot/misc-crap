@@ -4,7 +4,7 @@ use crate::game::battle::input::{Input};
 use super::ActionPoints;
 use super::{Battle};
 use super::event::{Event, EventKey, EventOrder, EventQueue, EventTime, Priority};
-use super::unit::{BattleUnit, BattleUnitKey};
+use super::unit::{BattleUnit, BattleUnitKey, BattleUnitStats};
 
 #[wasm_bindgen]
 #[derive(Clone, Debug)]
@@ -12,7 +12,6 @@ pub struct Turn {
     /* key can't be pub https://github.com/rustwasm/wasm-bindgen/issues/1775 */
     unit_key: BattleUnitKey,
     pub ap: ActionPoints,
-    pub delta: EventTime,
     pub key: EventKey,
 }
 
@@ -30,20 +29,13 @@ impl Turn {
 }
 
 impl Turn {
-    pub fn new(unit_key: BattleUnitKey,
-            ap: ActionPoints,
-            delta: EventTime) -> Turn {
+    pub fn new(unit_key: BattleUnitKey, ap: ActionPoints) -> Turn {
         Turn{
             unit_key: unit_key,
             ap: ap,
-            delta: delta,
             key: EventKey::zero(),
         }
     }
-}
-
-fn insert_turn(battle: &mut Battle, turn: Turn) {
-    battle.insert_event(turn.delta, Priority::Turn, Box::new(turn));
 }
 
 impl Event for Turn {
@@ -71,12 +63,15 @@ mod tests {
     #[should_panic]
     fn test_input_panic() {
         let mut b = Battle::new(HexGrid::new());
+        let unit_key = b.new_unit_key(String::from("a"));
+        b.insert_unit(BattleUnit::from(unit_key.clone(),
+                                       &BattleUnitStats::new_for_test()));
         for _ in 0..2 {
-            insert_turn(&mut b, Turn::new(
-                String::from("a") as BattleUnitKey,
-                0 as ActionPoints,
-                10 as EventTime,
-            ));
+            b.insert_unit_turn(10 as EventTime,
+                               Turn::new(
+                                  unit_key.clone(),
+                                  0 as ActionPoints,
+                               ));
         }
 
         b.advance(None);
@@ -88,12 +83,15 @@ mod tests {
     #[test]
     fn test_input() {
         let mut b = Battle::new(HexGrid::new());
+        let unit_key = b.new_unit_key(String::from("a"));
+        b.insert_unit(BattleUnit::from(unit_key.clone(),
+                                       &BattleUnitStats::new_for_test()));
         for _ in 0..2 {
-            insert_turn(&mut b, Turn::new(
-                String::from("a") as BattleUnitKey,
-                0 as ActionPoints,
-                10 as EventTime,
-            ));
+            b.insert_unit_turn(10 as EventTime,
+                               Turn::new(
+                                   unit_key.clone(),
+                                   0 as ActionPoints,
+                               ));
         }
 
         let _ = b.advance(None);
