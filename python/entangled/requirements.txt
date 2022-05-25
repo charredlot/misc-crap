@@ -50,7 +50,7 @@ pycurl==7.43.0.1
 pygame==1.9.6
 pygeoif==0.6
 pygobject==3.26.1
-PyJWT==1.5.3
+PyJWT==2.4.0
 pymacaroons==0.13.0
 PyNaCl==1.1.2
 pyparsing==2.2.0
